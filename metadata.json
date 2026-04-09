@@ -1,0 +1,7 @@
+{
+  "name": "VELA Jewellers",
+  "description": "A premium custom ring experience and companion app for VELA Jewellers.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
