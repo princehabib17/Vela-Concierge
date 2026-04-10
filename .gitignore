@@ -10,3 +10,4 @@ coverage/
 # Agent / local tooling (do not commit)
 tmp/
 .autopilot.json
+.cursor/
