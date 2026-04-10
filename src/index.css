@@ -181,18 +181,27 @@
   .lux-border  { border-color: var(--lux-border); }
   .lux-ui      { font-family: var(--font-sans); letter-spacing: 0.04em; }
   .lux-display { font-family: var(--font-serif); letter-spacing: 0.02em; }
-  /* Mirrors dark-route hierarchy on light configurator */
+  /* Mirrors dark-route hierarchy on light configurator.
+     (Do not @apply .lux-ui / .lux-display here — Tailwind v4 build rejects @apply of custom utilities.) */
   .lux-kicker {
-    @apply lux-ui text-[10px] font-medium uppercase tracking-[0.2em] text-[#9b7a2a];
+    font-family: var(--font-sans);
+    letter-spacing: 0.04em;
+    @apply text-[10px] font-medium uppercase tracking-[0.2em] text-[#9b7a2a];
   }
   .lux-page-title {
-    @apply lux-display text-xl font-normal leading-tight tracking-tight text-[#121212];
+    font-family: var(--font-serif);
+    letter-spacing: 0.02em;
+    @apply text-xl font-normal leading-tight tracking-tight text-[#121212];
   }
   .lux-page-lede {
-    @apply lux-ui mt-0.5 text-[10px] font-normal uppercase tracking-[0.16em] text-[#707070];
+    font-family: var(--font-sans);
+    letter-spacing: 0.04em;
+    @apply mt-0.5 text-[10px] font-normal uppercase tracking-[0.16em] text-[#707070];
   }
   .lux-chip {
-    @apply lux-ui inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border px-5 text-[10px] font-medium uppercase tracking-[0.14em] transition-colors;
+    font-family: var(--font-sans);
+    letter-spacing: 0.04em;
+    @apply inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border px-5 text-[10px] font-medium uppercase tracking-[0.14em] transition-colors;
   }
   .lux-chip-inactive {
     @apply border-[#d8d8d8] bg-white text-[#121212] hover:border-[#b8b8b8];
