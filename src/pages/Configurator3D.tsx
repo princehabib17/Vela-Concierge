@@ -468,8 +468,6 @@ export default function Configurator3D() {
                       </div>
                     </div>
                   )}
-                </div>
-              )}
 
               {activeTab === 'setting' && (
                 <div className="grid grid-cols-2 gap-4">
