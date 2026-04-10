@@ -62,7 +62,7 @@ export default function AIDesign() {
   };
 
   return (
-    <div className="p-6 pt-12 h-full overflow-y-auto flex flex-col">
+    <div className="flex min-h-0 h-full flex-col overflow-y-auto p-6 pt-12">
       <header className="mb-8">
         <h1 className="text-2xl font-serif mb-2">AI Design Studio</h1>
         <p className="text-vela-light/60 text-sm font-light">Describe your dream ring, and our AI will visualize it for you.</p>

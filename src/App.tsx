@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Home as HomeIcon, Sparkles, Box, Camera, Map, Ruler, Diamond, User } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { cn } from './lib/utils';
 
 // Components for pages
@@ -13,39 +13,43 @@ import JourneyTracker from './pages/JourneyTracker';
 import JewelleryBox from './pages/JewelleryBox';
 import RingSizer from './pages/RingSizer';
 import Profile from './pages/Profile';
+import Wishlist from './pages/Wishlist';
 
 function SplashScreen() {
-  const [isVisible, setIsVisible] = useState(true);
+  /** visible → fading (pointer-events off so UI is usable while overlay fades) → unmounted */
+  const [phase, setPhase] = useState<'visible' | 'fading' | 'off'>('visible');
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsVisible(false);
-    }, 2500);
-    return () => clearTimeout(timer);
+    const startFade = setTimeout(() => setPhase('fading'), 2400);
+    const remove = setTimeout(() => setPhase('off'), 2400 + 800);
+    return () => {
+      clearTimeout(startFade);
+      clearTimeout(remove);
+    };
   }, []);
 
+  if (phase === 'off') return null;
+
   return (
-    <AnimatePresence>
-      {isVisible && (
-        <motion.div
-          initial={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.8, ease: "easeInOut" }}
-          className="fixed inset-0 z-[100] bg-vela-black flex flex-col items-center justify-center"
-        >
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0, filter: 'blur(10px)' }}
-            animate={{ scale: 1, opacity: 1, filter: 'blur(0px)' }}
-            transition={{ duration: 1.5, ease: "easeOut" }}
-            className="flex flex-col items-center"
-          >
-            <Diamond className="text-vela-gold mb-8" size={48} strokeWidth={1} />
-            <h1 className="text-5xl font-serif tracking-[0.3em] text-vela-gold mb-4 uppercase ml-3">Vela</h1>
-            <p className="text-vela-light/60 text-xs font-light tracking-[0.4em] uppercase ml-1">Bespoke Jewellers</p>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <motion.div
+      aria-hidden={phase === 'fading'}
+      initial={{ opacity: 1 }}
+      animate={{ opacity: phase === 'fading' ? 0 : 1 }}
+      transition={{ duration: 0.8, ease: 'easeInOut' }}
+      className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-vela-black"
+      style={{ pointerEvents: phase === 'fading' ? 'none' : 'auto' }}
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0, filter: 'blur(10px)' }}
+        animate={{ scale: 1, opacity: 1, filter: 'blur(0px)' }}
+        transition={{ duration: 1.5, ease: 'easeOut' }}
+        className="flex flex-col items-center"
+      >
+        <Diamond className="mb-8 text-vela-gold" size={48} strokeWidth={1} />
+        <h1 className="mb-4 ml-3 text-5xl font-serif uppercase tracking-[0.3em] text-vela-gold">Vela</h1>
+        <p className="ml-1 text-xs font-light uppercase tracking-[0.4em] text-vela-light/60">Bespoke Jewellers</p>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -87,7 +91,7 @@ function Navigation() {
 
 function Header() {
   return (
-    <header className="sticky top-0 z-40 bg-gradient-to-b from-vela-black/90 to-vela-black/0 backdrop-blur-sm px-6 py-4 flex justify-between items-center">
+    <header className="sticky top-0 z-40 shrink-0 bg-gradient-to-b from-vela-black/90 to-vela-black/0 backdrop-blur-sm px-6 py-4 flex justify-between items-center">
       <div className="flex items-center gap-2">
         <Diamond className="text-vela-gold" size={20} strokeWidth={1.5} />
         <h1 className="text-xl font-serif tracking-widest uppercase text-vela-light">Vela</h1>
@@ -111,9 +115,9 @@ export default function App() {
   return (
     <BrowserRouter>
       <SplashScreen />
-      <div className="min-h-screen bg-vela-black text-vela-light flex flex-col font-sans pb-20">
+      <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-vela-black text-vela-light font-sans">
         <Header />
-        <main className="flex-1 w-full max-w-md mx-auto relative">
+        <main className="relative flex min-h-0 flex-1 flex-col w-full max-w-md mx-auto overflow-hidden pb-20">
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/design/ai" element={<AIDesign />} />
@@ -123,6 +127,7 @@ export default function App() {
             <Route path="/jewellery-box" element={<JewelleryBox />} />
             <Route path="/sizer" element={<RingSizer />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/wishlist" element={<Wishlist />} />
           </Routes>
         </main>
         <Navigation />
