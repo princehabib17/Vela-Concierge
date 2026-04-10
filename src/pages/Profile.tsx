@@ -35,7 +35,7 @@ export default function Profile() {
           <ChevronRight size={18} className="text-vela-light/30 group-hover:text-vela-gold transition-colors" />
         </Link>
 
-        <Link to="/ring-sizer" className="bg-vela-dark p-4 rounded-lg border border-vela-gray/30 flex items-center justify-between hover:border-vela-gold/50 transition-colors group">
+        <Link to="/sizer" className="bg-vela-dark p-4 rounded-lg border border-vela-gray/30 flex items-center justify-between hover:border-vela-gold/50 transition-colors group">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 rounded-full bg-vela-black flex items-center justify-center">
               <Ruler className="text-vela-gold" size={18} />
@@ -48,7 +48,7 @@ export default function Profile() {
           <ChevronRight size={18} className="text-vela-light/30 group-hover:text-vela-gold transition-colors" />
         </Link>
 
-        <Link to="/wishlist" className="bg-vela-dark p-4 rounded-lg border border-vela-gray/30 flex items-center justify-between hover:border-vela-gold/50 transition-colors group">
+        <button type="button" className="w-full bg-vela-dark p-4 rounded-lg border border-vela-gray/30 flex items-center justify-between hover:border-vela-gold/50 transition-colors group">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 rounded-full bg-vela-black flex items-center justify-center">
               <Heart className="text-vela-gold" size={18} />
@@ -59,7 +59,7 @@ export default function Profile() {
             </div>
           </div>
           <ChevronRight size={18} className="text-vela-light/30 group-hover:text-vela-gold transition-colors" />
-        </Link>
+        </button>
       </div>
 
       <div className="mt-12 pt-6 border-t border-vela-gray/30">

@@ -1,11 +1,10 @@
-import { useState, Suspense, useRef, useMemo, Component, type ReactNode } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Environment, Text, Float } from '@react-three/drei';
+import { useState, Suspense, useRef, useMemo, Component, type ReactNode, useEffect } from 'react';
+import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber';
+import { OrbitControls, Environment, Text, Float, ContactShadows, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronRight } from 'lucide-react';
-import { useFrame, useLoader } from '@react-three/fiber';
+import { Check, ChevronRight } from 'lucide-react';
 import { FBXLoader } from 'three-stdlib';
 
 class CanvasErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
@@ -31,21 +30,56 @@ class CanvasErrorBoundary extends Component<{ children: ReactNode }, { hasError:
   }
 }
 
-// Photorealistic CAD-Quality Ring Component
-function RingModel({ metal, stone, shape, engraving, bandStyle, settingStyle }: any) {
-  const group = useRef<THREE.Group>(null);
-  
-  // Load the external FBX file you placed in the Vela-Concierge folder
-  const fbx = useLoader(FBXLoader, '/eternal-pear-ring-free-3d-jewelry-model.FBX');
-  // Define ultra-realistic physical materials
-  const metalProps = { 
-    metalness: 1, 
-    roughness: 0.05, // polished luxury metal
-    clearcoat: 1, 
-    clearcoatRoughness: 0.1, 
-    envMapIntensity: 2.5 
+type RingConfig = {
+  metal: 'yellow gold' | 'white gold' | 'rose gold' | 'platinum';
+  stone: 'diamond' | 'emerald' | 'sapphire' | 'ruby';
+  shape: 'round' | 'emerald' | 'oval';
+  bandStyle: 'plain' | 'pave';
+  settingStyle: 'solitaire' | 'bezel';
+  engraving: string;
+};
+
+function Loading3D() {
+  return (
+    <Html center>
+      <div className="rounded-xl border border-black/10 bg-white/85 px-4 py-2 text-xs uppercase tracking-wider text-black/60 shadow-sm">
+        Loading 3D model...
+      </div>
+    </Html>
+  );
+}
+
+function CameraRig({ view }: { view: 'hero' | 'top' | 'profile' }) {
+  const { camera } = useThree();
+  const targets: Record<'hero' | 'top' | 'profile', [number, number, number]> = {
+    hero: [0.8, 1.4, 3.6],
+    top: [0.2, 3.2, 1.4],
+    profile: [2.8, 1, 0.2]
   };
-  
+
+  useFrame((_, delta) => {
+    const [x, y, z] = targets[view];
+    const t = Math.min(1, delta * 4.5);
+    camera.position.lerp(new THREE.Vector3(x, y, z), t);
+    camera.lookAt(0, 0, 0);
+  });
+
+  return null;
+}
+
+// Photorealistic CAD-Quality Ring Component
+function RingModel({ metal, stone, shape, engraving, bandStyle, settingStyle }: RingConfig) {
+  const group = useRef<THREE.Group>(null);
+
+  const fbx = useLoader(FBXLoader, '/eternal-pear-ring-free-3d-jewelry-model.FBX');
+  const metalProps = {
+    metalness: 1,
+    roughness: 0.05,
+    clearcoat: 1,
+    clearcoatRoughness: 0.1,
+    envMapIntensity: 2.5
+  };
+
   const materials = useMemo(() => ({
     'yellow gold': new THREE.MeshPhysicalMaterial({ color: '#E5C07B', ...metalProps }),
     'rose gold': new THREE.MeshPhysicalMaterial({ color: '#DDA7A5', ...metalProps }),
@@ -53,12 +87,11 @@ function RingModel({ metal, stone, shape, engraving, bandStyle, settingStyle }: 
     'platinum': new THREE.MeshPhysicalMaterial({ color: '#E5E4E2', ...metalProps, roughness: 0.01, envMapIntensity: 3 }),
   }), []);
 
-  // Setting material: Two-tone setting (classic luxury technique: white gold prongs for colored bands)
   const settingMaterial = (metal === 'yellow gold' || metal === 'rose gold')
     ? materials['white gold']
-    : materials[metal as keyof typeof materials];
+    : materials[metal];
 
-  const activeMetal = materials[metal as keyof typeof materials] || materials['yellow gold'];
+  const activeMetal = materials[metal] || materials['yellow gold'];
 
   const stoneProps = useMemo(() => ({
     'diamond': { color: '#ffffff', transmission: 1, ior: 2.417, thickness: 1.5, roughness: 0, dispersion: 1.5 },
@@ -67,26 +100,21 @@ function RingModel({ metal, stone, shape, engraving, bandStyle, settingStyle }: 
     'ruby': { color: '#E0115F', transmission: 1, ior: 1.762, thickness: 1.5, roughness: 0, dispersion: 0.5 },
   }), []);
   
-  const activeStoneProps = stoneProps[stone as keyof typeof stoneProps] || stoneProps['diamond'];
+  const stoneMaterials = useMemo(() => ({
+    diamond: new THREE.MeshPhysicalMaterial({ ...stoneProps.diamond, envMapIntensity: 4, transparent: true, side: THREE.DoubleSide }),
+    emerald: new THREE.MeshPhysicalMaterial({ ...stoneProps.emerald, envMapIntensity: 4, transparent: true, side: THREE.DoubleSide }),
+    sapphire: new THREE.MeshPhysicalMaterial({ ...stoneProps.sapphire, envMapIntensity: 4, transparent: true, side: THREE.DoubleSide }),
+    ruby: new THREE.MeshPhysicalMaterial({ ...stoneProps.ruby, envMapIntensity: 4, transparent: true, side: THREE.DoubleSide }),
+  }), [stoneProps]);
+  const stoneMaterial = stoneMaterials[stone];
 
-  const stoneMaterial = useMemo(() => {
-    return new THREE.MeshPhysicalMaterial({
-      ...activeStoneProps,
-      envMapIntensity: 4,
-      transparent: true,
-      side: THREE.DoubleSide
-    });
-  }, [activeStoneProps]);
-
-  // Initialize geometry heavily only ONCE (prevents JS thread freezing)
   useEffect(() => {
     if (!fbx.userData.initialized) {
       fbx.traverse((child: any) => {
         if (child.isMesh) {
-          // Disable shadow casting for heavy meshes to prevent GPU timeouts
           child.castShadow = false;
           child.receiveShadow = false;
-          
+
           if (!child.userData.normalsComputed) {
             child.geometry.computeVertexNormals();
             child.userData.normalsComputed = true;
@@ -94,50 +122,66 @@ function RingModel({ metal, stone, shape, engraving, bandStyle, settingStyle }: 
         }
       });
 
-      // Center and scale the FBX
       const box = new THREE.Box3().setFromObject(fbx);
       const center = box.getCenter(new THREE.Vector3());
       fbx.position.sub(center);
       fbx.position.y += 0.8;
-      
-      // FBX sizes can vary drastically. Scale it down to fit.
       fbx.scale.set(0.015, 0.015, 0.015);
       fbx.userData.initialized = true;
     }
   }, [fbx]);
 
-  // Dynamically patch materials
   useEffect(() => {
     fbx.traverse((child: any) => {
       if (child.isMesh) {
         const matName = child.material?.name?.toLowerCase() || child.name?.toLowerCase() || '';
-        
-        // Intelligent material assignment based on typical FBX part names
         if (matName.includes("diamond") || matName.includes("gem") || matName.includes("stone")) {
            child.material = stoneMaterial;
+           if (!child.userData.baseScale) child.userData.baseScale = child.scale.clone();
+           if (!child.userData.basePosition) child.userData.basePosition = child.position.clone();
+           child.position.copy(child.userData.basePosition);
+           if (shape === 'oval') child.scale.set(child.userData.baseScale.x * 1.15, child.userData.baseScale.y * 0.9, child.userData.baseScale.z);
+           if (shape === 'emerald') child.scale.set(child.userData.baseScale.x * 1.1, child.userData.baseScale.y * 0.85, child.userData.baseScale.z * 1.05);
+           if (shape === 'round') child.scale.copy(child.userData.baseScale);
+           if (settingStyle === 'bezel') child.position.y += 0.01;
         } else if (matName.includes("setting") || matName.includes("prong")) {
            child.material = settingMaterial;
+           if (!child.userData.baseScale) child.userData.baseScale = child.scale.clone();
+           if (settingStyle === 'bezel') {
+             child.scale.copy(child.userData.baseScale.clone().multiplyScalar(1.03));
+           } else {
+             child.scale.copy(child.userData.baseScale);
+           }
         } else {
-           // Default to main metal for the band
            child.material = activeMetal;
+           if (!child.userData.baseScale) child.userData.baseScale = child.scale.clone();
+           child.scale.copy(child.userData.baseScale);
+           if (bandStyle === 'pave') {
+             child.scale.set(child.scale.x * 1.02, child.scale.y, child.scale.z * 1.02);
+           }
         }
         child.material.needsUpdate = true;
       }
     });
-  }, [fbx, activeMetal, settingMaterial, stoneMaterial]);  useFrame(() => {
+  }, [fbx, activeMetal, settingMaterial, stoneMaterial, shape, bandStyle, settingStyle]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(materials).forEach((material) => material.dispose());
+      Object.values(stoneMaterials).forEach((material) => material.dispose());
+    };
+  }, [materials, stoneMaterials]);
+
+  useFrame(() => {
     if (group.current) {
-      group.current.rotation.y += 0.005; // Elegant rotation
+      group.current.rotation.y += 0.004;
     }
   });
 
   return (
     <Float speed={1.2} rotationIntensity={0.03} floatIntensity={0.06}>
       <group ref={group} position={[0, -0.4, 0]}>
-        
-        {/* Render the hydrated FBX file directly */}
         <primitive object={fbx} />
-
-        {/* Dynamic Engraving overlaid on the geometry's relative coord system */}
         {engraving && (
            <Text
             position={[-0.2, 0.6, 0.9]}
@@ -159,14 +203,21 @@ function RingModel({ metal, stone, shape, engraving, bandStyle, settingStyle }: 
 export default function Configurator3D() {
   const [activeTab, setActiveTab] = useState('metal');
   const [view, setView] = useState<'hero' | 'top' | 'profile'>('hero');
-  const [config, setConfig] = useState({
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
+  const [config, setConfig] = useState<RingConfig>({
     metal: 'yellow gold',
     stone: 'diamond',
+    shape: 'round',
+    bandStyle: 'plain',
+    settingStyle: 'solitaire',
     engraving: ''
   });
 
   const tabs = [
     { id: 'metal', label: 'Metal' },
+    { id: 'band', label: 'Band' },
+    { id: 'setting', label: 'Setting' },
     { id: 'stone', label: 'Stone' },
     { id: 'engrave', label: 'Engraving' }
   ];
@@ -188,18 +239,23 @@ export default function Configurator3D() {
   const shapeOptions = ['round', 'emerald', 'oval'];
   const bandOptions = ['plain', 'pave'];
   const settingOptions = ['solitaire', 'bezel'];
-  const cameraByView = {
-    hero: [0.8, 1.4, 3.6],
-    top: [0.2, 3.2, 1.4],
-    profile: [2.8, 1, 0.2]
-  } as const;
-
-  // Calculate estimated price
   const basePrice = 2500;
   const metalPrice = config.metal === 'platinum' ? 800 : 0;
   const stonePrice = config.stone === 'diamond' ? 4500 : 1800;
-  
-  const estimatedPrice = basePrice + metalPrice + stonePrice;
+  const bandPrice = config.bandStyle === 'pave' ? 400 : 0;
+  const settingPrice = config.settingStyle === 'bezel' ? 150 : 0;
+  const estimatedPrice = basePrice + metalPrice + stonePrice + bandPrice + settingPrice;
+
+  const saveToBrief = () => {
+    setIsSaving(true);
+    setSaveMessage('');
+    window.localStorage.setItem('vela-ring-brief', JSON.stringify({ ...config, estimatedPrice, savedAt: new Date().toISOString() }));
+    setTimeout(() => {
+      setIsSaving(false);
+      setSaveMessage('Saved to your brief');
+      setTimeout(() => setSaveMessage(''), 2000);
+    }, 500);
+  };
 
   return (
     <div className="h-full flex flex-col bg-[#f7f7f5] text-[#111111]">
@@ -212,17 +268,17 @@ export default function Configurator3D() {
       <div className="flex-1 relative mt-16 bg-[radial-gradient(circle_at_42%_26%,#ffffff_0%,#f0f0ed_60%,#e4e4de_100%)]">
         <CanvasErrorBoundary>
           <Canvas 
-            camera={{ position: cameraByView[view], fov: 35 }}
+            camera={{ position: [0.8, 1.4, 3.6], fov: 35 }}
             dpr={typeof window !== 'undefined' ? Math.min(window.devicePixelRatio, 2) : 1.5}
             gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.32, powerPreference: "high-performance" }}
           >
-            {/* Intense Studio Lighting Setup */}
+            <CameraRig view={view} />
             <ambientLight intensity={1.15} />
             <spotLight position={[8, 12, 10]} angle={0.32} penumbra={1} intensity={3.2} castShadow />
             <spotLight position={[-7, 9, -9]} angle={0.35} penumbra={1} intensity={1.6} />
             <pointLight position={[0, 4, 1]} intensity={1.4} />
             
-            <Suspense fallback={null}>
+            <Suspense fallback={<Loading3D />}>
               <RingModel {...config} />
               <Environment preset="city" />
               <ContactShadows position={[0, -1.45, 0]} opacity={0.3} scale={7} blur={2.8} far={4} color="#777777" />
@@ -295,7 +351,7 @@ export default function Configurator3D() {
                   {metalOptions.map(m => (
                     <button
                       key={m.id}
-                      onClick={() => setConfig({...config, metal: m.id})}
+                      onClick={() => setConfig({...config, metal: m.id as RingConfig['metal']})}
                       className="flex flex-col items-center gap-2 group"
                     >
                       <div className={cn(
@@ -319,7 +375,7 @@ export default function Configurator3D() {
                   {bandOptions.map(b => (
                     <button
                       key={b}
-                      onClick={() => setConfig({...config, bandStyle: b})}
+                      onClick={() => setConfig({...config, bandStyle: b as RingConfig['bandStyle']})}
                       className={cn(
                         "p-4 rounded-xl border transition-all duration-300 flex flex-col items-center gap-2",
                         config.bandStyle === b ? "border-[#d4af37] bg-[#d4af37]/5" : "border-black/20 hover:border-black/40"
@@ -337,12 +393,12 @@ export default function Configurator3D() {
                 {/* Stone Selection */}
                 {activeTab === 'stone' && (
                   <div className="space-y-4">
-                    <p className="text-xs text-white/40 uppercase tracking-widest mb-4">Select Center Stone</p>
+                    <p className="text-xs text-black/45 uppercase tracking-widest mb-4">Select Center Stone</p>
                     <div className="grid grid-cols-2 gap-3">
                       {stoneOptions.map(s => (
                         <button
                           key={s.id}
-                          onClick={() => setConfig({...config, stone: s.id})}
+                          onClick={() => setConfig({...config, stone: s.id as RingConfig['stone']})}
                           className={cn(
                             "flex items-center gap-3 p-3 rounded-xl border transition-all duration-300",
                             config.stone === s.id ? "border-vela-gold bg-vela-gold/10" : "border-white/5 hover:border-white/20 bg-white/5"
@@ -353,7 +409,7 @@ export default function Configurator3D() {
                             s.color,
                             config.stone === s.id ? "ring-2 ring-[#d4af37] ring-offset-2 ring-offset-white scale-110" : "opacity-70 group-hover:opacity-100 group-hover:scale-105"
                           )}>
-                            {config.stone === s.id && s.id !== 'none' && <Check size={14} className={s.id === 'diamond' ? 'text-black' : 'text-white'} />}
+                            {config.stone === s.id && <Check size={14} className={s.id === 'diamond' ? 'text-black' : 'text-white'} />}
                           </div>
                           <span className={cn(
                             "text-[10px] uppercase tracking-wider text-center",
@@ -365,32 +421,30 @@ export default function Configurator3D() {
                   </div>
                 )}
 
-                  {config.stone !== 'none' && (
-                    <div className="pt-4 border-t border-black/10">
-                      <h4 className="text-[10px] text-black/50 uppercase tracking-wider mb-3">Stone Shape</h4>
-                      <div className="flex gap-3">
-                        {shapeOptions.map(s => (
-                          <button
-                            key={s}
-                            onClick={() => setConfig({...config, shape: s})}
-                            className={cn(
-                              "px-4 py-2 rounded-full text-xs tracking-wider uppercase border transition-all",
-                              config.shape === s ? "border-[#d4af37] text-[#9a7a1f] bg-[#d4af37]/10" : "border-black/20 text-black/70 hover:border-black/50"
-                            )}
-                          >
-                            {s}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                <div className="pt-4 border-t border-black/10">
+                  <h4 className="text-[10px] text-black/50 uppercase tracking-wider mb-3">Stone Shape</h4>
+                  <div className="flex gap-3">
+                    {shapeOptions.map(s => (
+                      <button
+                        key={s}
+                        onClick={() => setConfig({...config, shape: s as RingConfig['shape']})}
+                        className={cn(
+                          "px-4 py-2 rounded-full text-xs tracking-wider uppercase border transition-all",
+                          config.shape === s ? "border-[#d4af37] text-[#9a7a1f] bg-[#d4af37]/10" : "border-black/20 text-black/70 hover:border-black/50"
+                        )}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
               {activeTab === 'setting' && (
                 <div className="grid grid-cols-2 gap-4">
                   {settingOptions.map(s => (
                     <button
                       key={s}
-                      onClick={() => setConfig({...config, settingStyle: s})}
+                      onClick={() => setConfig({...config, settingStyle: s as RingConfig['settingStyle']})}
                       className={cn(
                         "p-4 rounded-xl border transition-all duration-300 flex flex-col items-center gap-2",
                         config.settingStyle === s ? "border-[#d4af37] bg-[#d4af37]/5" : "border-black/20 hover:border-black/40"
@@ -423,9 +477,14 @@ export default function Configurator3D() {
         </div>
 
         <div className="p-4 pt-0 pb-24">
-          <button className="w-full bg-[#d4af37] text-black py-4 rounded-xl font-medium tracking-widest uppercase text-xs hover:bg-[#c59b2d] transition-all hover:scale-[1.02] flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(212,175,55,0.25)]">
-            Save to Brief <ChevronRight size={16} />
+          <button
+            onClick={saveToBrief}
+            disabled={isSaving}
+            className="w-full bg-[#d4af37] text-black py-4 rounded-xl font-medium tracking-widest uppercase text-xs hover:bg-[#c59b2d] transition-all hover:scale-[1.02] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(212,175,55,0.25)]"
+          >
+            {isSaving ? 'Saving...' : 'Save to Brief'} <ChevronRight size={16} />
           </button>
+          {saveMessage && <p className="mt-2 text-center text-[11px] uppercase tracking-wider text-[#9a7a1f]">{saveMessage}</p>}
         </div>
       </div>
     </div>
