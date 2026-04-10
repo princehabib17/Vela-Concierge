@@ -1,173 +1,120 @@
 import { useState, Suspense, useRef, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Environment, ContactShadows, Text, MeshTransmissionMaterial, Float, Instances, Instance } from '@react-three/drei';
+import { OrbitControls, Environment, Text, Float } from '@react-three/drei';
 import * as THREE from 'three';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
-import { Check, ChevronRight } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
+import { useLoader } from '@react-three/fiber';
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 
-// Photorealistic CAD-Quality Ring Component
-function RingModel({ metal, stone, shape, engraving, bandStyle, settingStyle }: any) {
+// Photorealistic CAD-Quality Ring Component loading user's custom .obj
+function RingModel({ metal, stone, engraving }: any) {
   const group = useRef<THREE.Group>(null);
   
-  // High-end metal materials (highly polished, reflective)
+  // Load the external OBJ file
+  const obj = useLoader(OBJLoader, '/ring.obj');
+
+  // Define ultra-realistic physical materials
   const metalProps = { 
     metalness: 1, 
-    roughness: 0.02, // Extremely polished
+    roughness: 0.05, // polished luxury metal
     clearcoat: 1, 
-    clearcoatRoughness: 0.05, 
+    clearcoatRoughness: 0.1, 
     envMapIntensity: 2.5 
   };
   
   const materials = useMemo(() => ({
     'yellow gold': new THREE.MeshPhysicalMaterial({ color: '#E5C07B', ...metalProps }),
     'rose gold': new THREE.MeshPhysicalMaterial({ color: '#DDA7A5', ...metalProps }),
-    'white gold': new THREE.MeshPhysicalMaterial({ color: '#F3F3F3', ...metalProps }),
+    'white gold': new THREE.MeshPhysicalMaterial({ color: '#F8F9FA', ...metalProps, roughness: 0.03 }),
     'platinum': new THREE.MeshPhysicalMaterial({ color: '#E5E4E2', ...metalProps, roughness: 0.01, envMapIntensity: 3 }),
-    'silver': new THREE.MeshPhysicalMaterial({ color: '#C0C0C0', ...metalProps, roughness: 0.05 }),
   }), []);
 
-  // Setting material: White gold for yellow/rose bands to make the diamond pop (classic luxury technique)
+  // Setting material: Two-tone setting (classic luxury technique: white gold prongs for colored bands)
   const settingMaterial = (metal === 'yellow gold' || metal === 'rose gold')
     ? materials['white gold']
     : materials[metal as keyof typeof materials];
 
   const activeMetal = materials[metal as keyof typeof materials] || materials['yellow gold'];
 
-  // Advanced Stone properties for MeshTransmissionMaterial
   const stoneProps = useMemo(() => ({
-    'diamond': { color: '#ffffff', transmission: 1, ior: 2.417, thickness: 1.2, roughness: 0, chromaticAberration: 0.06, backside: true },
-    'emerald': { color: '#50C878', transmission: 1, ior: 1.577, thickness: 1.2, roughness: 0, chromaticAberration: 0.02, backside: true },
-    'sapphire': { color: '#0F52BA', transmission: 1, ior: 1.762, thickness: 1.2, roughness: 0, chromaticAberration: 0.02, backside: true },
-    'ruby': { color: '#E0115F', transmission: 1, ior: 1.762, thickness: 1.2, roughness: 0, chromaticAberration: 0.02, backside: true },
+    'diamond': { color: '#ffffff', transmission: 1, ior: 2.417, thickness: 1.5, roughness: 0, dispersion: 1.5 },
+    'emerald': { color: '#50C878', transmission: 1, ior: 1.577, thickness: 1.5, roughness: 0, dispersion: 0.8 },
+    'sapphire': { color: '#0F52BA', transmission: 1, ior: 1.762, thickness: 1.5, roughness: 0, dispersion: 0.5 },
+    'ruby': { color: '#E0115F', transmission: 1, ior: 1.762, thickness: 1.5, roughness: 0, dispersion: 0.5 },
   }), []);
   
   const activeStoneProps = stoneProps[stone as keyof typeof stoneProps] || stoneProps['diamond'];
 
-  // Precise Diamond Profile (Lathe Geometry Points) for a Brilliant Cut
-  const diamondPoints = useMemo(() => {
-    return [
-      new THREE.Vector2(0, -0.3),     // Culet (bottom point)
-      new THREE.Vector2(0.35, 0.05),  // Girdle bottom
-      new THREE.Vector2(0.35, 0.1),   // Girdle top
-      new THREE.Vector2(0.2, 0.2),    // Table edge
-      new THREE.Vector2(0, 0.2)       // Table center (top flat part)
-    ];
-  }, []);
+  const stoneMaterial = useMemo(() => {
+    return new THREE.MeshPhysicalMaterial({
+      ...activeStoneProps,
+      envMapIntensity: 4,
+      transparent: true,
+      side: THREE.DoubleSide
+    });
+  }, [activeStoneProps]);
 
-  // Shared geometry and material for Pavé diamonds
-  const paveGeometry = useMemo(() => new THREE.OctahedronGeometry(0.035, 1), []);
-  const paveMaterial = useMemo(() => new THREE.MeshPhysicalMaterial({
-    color: '#ffffff',
-    transmission: 0.9,
-    opacity: 1,
-    metalness: 0.1,
-    roughness: 0,
-    ior: 2.4,
-    thickness: 0.5,
-    envMapIntensity: 2.5,
-  }), []);
+  // Clone the OBJ and map materials dynamically based on the discovered internal material names
+  const objClone = useMemo(() => {
+    const clone = obj.clone();
+    
+    clone.traverse((child: any) => {
+      if (child.isMesh) {
+        // Essential for shadows/reflections
+        child.castShadow = true;
+        child.receiveShadow = true;
+        
+        // Ensure smooth shading for metal and somewhat flat for facets if necessary
+        child.geometry.computeVertexNormals();
+
+        const matName = child.material.name;
+        // The downloaded OBJ uses specific material names
+        // _Material_1 is usually the main band
+        if (matName.includes("Material_1")) {
+           child.material = activeMetal;
+        } 
+        // _Material_28 often represents the setting / crown
+        else if (matName.includes("Material_28")) {
+           child.material = settingMaterial;
+        } 
+        // Assume anything else (Material_2, etc) are diamonds (center and pave)
+        else {
+           child.material = stoneMaterial;
+        }
+      }
+    });
+
+    // Center and scale the geometry for our viewport
+    const box = new THREE.Box3().setFromObject(clone);
+    const center = box.getCenter(new THREE.Vector3());
+    clone.position.sub(center); // Center it
+    clone.position.y += 0.8; // Lift
+    clone.scale.set(0.08, 0.08, 0.08); // Adjust scale of raw OBJ to fit canvas
+
+    return clone;
+  }, [obj, activeMetal, settingMaterial, stoneMaterial]);
 
   useFrame(() => {
     if (group.current) {
-      group.current.rotation.y += 0.003; // Elegant, slow rotation
+      group.current.rotation.y += 0.005; // Elegant rotation
     }
   });
 
   return (
-    <Float speed={1.5} rotationIntensity={0.05} floatIntensity={0.1}>
-      <group ref={group} position={[0, -0.2, 0]}>
-        {/* Band - Ergonomic D-Shape (taller than wide, thinner on sides) */}
-        <mesh material={activeMetal} scale={[1, 1.1, 0.7]}>
-          <torusGeometry args={[1, 0.1, 64, 128]} />
-        </mesh>
+    <Float speed={1.5} rotationIntensity={0.02} floatIntensity={0.05}>
+      <group ref={group} position={[0, -0.4, 0]}>
+        
+        {/* Render the hydrated OBJ file */}
+        <primitive object={objClone} />
 
-        {/* Pavé Diamonds - Optimized using InstancedMesh */}
-        {bandStyle === 'pave' && (
-          <Instances range={20} material={paveMaterial} geometry={paveGeometry}>
-            {Array.from({ length: 20 }).map((_, i) => {
-              const angle = (Math.PI / 4) + (i / 19) * (Math.PI / 2); // Top quadrant
-              if (angle > Math.PI/2 - 0.18 && angle < Math.PI/2 + 0.18) return null; // Gap for setting
-              return (
-                <Instance
-                  key={i}
-                  position={[
-                    Math.cos(angle) * 1.08,
-                    Math.sin(angle) * 1.08 * 1.1,
-                    0
-                  ]}
-                  rotation={[0, 0, angle]}
-                />
-              )
-            })}
-          </Instances>
-        )}
-
-        {/* Setting & Main Stone */}
-        {stone !== 'none' && (
-          <group position={[0, 1.05, 0]}>
-            {/* Base of setting (blends into the band) */}
-            <mesh material={settingMaterial} position={[0, -0.05, 0]}>
-              <cylinderGeometry args={[0.08, 0.12, 0.1, 32]} />
-            </mesh>
-            
-            {settingStyle === 'bezel' ? (
-              // Bezel Setting
-              <mesh material={settingMaterial} position={[0, 0.15, 0]}>
-                <cylinderGeometry args={[0.42, 0.2, 0.25, 64]} />
-              </mesh>
-            ) : (
-              // Realistic 6-Prong Setting (Classic Tiffany style)
-              <group>
-                {/* Gallery Rail (horizontal wire connecting prongs) */}
-                <mesh material={settingMaterial} position={[0, 0.08, 0]} rotation={[Math.PI/2, 0, 0]}>
-                  <torusGeometry args={[0.25, 0.02, 16, 64]} />
-                </mesh>
-                {/* Prongs */}
-                {[0, 1, 2, 3, 4, 5].map((i) => {
-                  const angle = (i / 6) * Math.PI * 2;
-                  return (
-                    <group key={i} rotation={[0, angle, 0]}>
-                      {/* Prong body (angled outwards from base to girdle) */}
-                      <mesh material={settingMaterial} position={[0, 0.1, 0.18]} rotation={[0.58, 0, 0]}>
-                        <cylinderGeometry args={[0.02, 0.03, 0.36, 16]} />
-                      </mesh>
-                      {/* Prong tip (rounded, holding the crown) */}
-                      <mesh material={settingMaterial} position={[0, 0.26, 0.27]} rotation={[0.58, 0, 0]}>
-                        <sphereGeometry args={[0.025, 16, 16]} />
-                      </mesh>
-                    </group>
-                  )
-                })}
-              </group>
-            )}
-            
-            {/* Stone - High-Fidelity Lathe Geometry */}
-            <mesh position={[0, 0.1, 0]} scale={shape === 'oval' ? [1, 1, 1.3] : shape === 'emerald' ? [0.8, 1, 1.2] : [1, 1, 1]}>
-              {shape === 'emerald' ? (
-                <octahedronGeometry args={[0.4, 2]} />
-              ) : (
-                <latheGeometry args={[diamondPoints, shape === 'oval' ? 32 : 16]} />
-              )}
-              <MeshTransmissionMaterial 
-                {...activeStoneProps} 
-                resolution={1024}
-                samples={8}
-                anisotropy={16}
-                clearcoat={1}
-                clearcoatRoughness={0}
-                envMapIntensity={3}
-              />
-            </mesh>
-          </group>
-        )}
-
-        {/* Engraving */}
+        {/* Dynamic Engraving overlaid on the geometry's relative coord system */}
         {engraving && (
-          <Text
-            position={[0, -0.88, 0.13]}
+           <Text
+            position={[-0.2, 0.6, 0.9]}
             rotation={[0, 0, 0]}
-            fontSize={0.06}
+            fontSize={0.04}
             color="#000000"
             anchorX="center"
             anchorY="middle"
@@ -185,19 +132,14 @@ export default function Configurator3D() {
   const [activeTab, setActiveTab] = useState('metal');
   const [config, setConfig] = useState({
     metal: 'yellow gold',
-    bandStyle: 'plain',
     stone: 'diamond',
-    shape: 'round',
-    settingStyle: 'solitaire',
     engraving: ''
   });
 
   const tabs = [
     { id: 'metal', label: 'Metal' },
-    { id: 'band', label: 'Band' },
     { id: 'stone', label: 'Stone' },
-    { id: 'setting', label: 'Setting' },
-    { id: 'engrave', label: 'Engrave' }
+    { id: 'engrave', label: 'Engraving' }
   ];
 
   const metalOptions = [
@@ -212,227 +154,167 @@ export default function Configurator3D() {
     { id: 'emerald', label: 'Emerald', color: 'bg-gradient-to-br from-[#50C878] to-[#043927]' },
     { id: 'sapphire', label: 'Sapphire', color: 'bg-gradient-to-br from-[#0F52BA] to-[#000080]' },
     { id: 'ruby', label: 'Ruby', color: 'bg-gradient-to-br from-[#E0115F] to-[#8B0000]' },
-    { id: 'none', label: 'No Stone', color: 'bg-transparent border border-dashed border-vela-gray' },
   ];
 
-  const shapeOptions = ['round', 'emerald', 'oval'];
-  const bandOptions = ['plain', 'pave'];
-  const settingOptions = ['solitaire', 'bezel'];
-
   // Calculate estimated price
-  const basePrice = 1000;
-  const metalPrice = config.metal === 'platinum' ? 500 : 0;
-  const bandPrice = config.bandStyle === 'pave' ? 400 : 0;
-  const settingPrice = config.settingStyle === 'bezel' ? 150 : 0;
-  const stonePrice = config.stone === 'diamond' ? 2000 : config.stone === 'none' ? 0 : 1200;
+  const basePrice = 2500;
+  const metalPrice = config.metal === 'platinum' ? 800 : 0;
+  const stonePrice = config.stone === 'diamond' ? 4500 : 1800;
   
-  const estimatedPrice = basePrice + metalPrice + bandPrice + settingPrice + stonePrice;
+  const estimatedPrice = basePrice + metalPrice + stonePrice;
 
   return (
-    <div className="h-full flex flex-col bg-vela-black">
-      <header className="p-6 pb-2 z-10 absolute top-0 left-0 right-0 pointer-events-none">
-        <h1 className="text-2xl font-serif mb-1 text-shadow-sm">3D Studio</h1>
-        <p className="text-vela-light/80 text-xs uppercase tracking-wider">Bespoke Configurator</p>
+    <div className="h-full w-full flex bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-vela-black via-[#0a0a0a] to-[#000000]">
+      <header className="p-8 absolute top-0 left-0 right-0 pointer-events-none z-10">
+        <h1 className="text-4xl font-serif text-white/90 drop-shadow-md">Studio</h1>
+        <p className="text-white/40 text-sm mt-1 uppercase tracking-[0.2em]">Bespoke Configurator</p>
       </header>
 
-      {/* Studio Lighting Background Gradient */}
-      <div className="flex-1 relative mt-16 bg-[radial-gradient(circle_at_center,#2A2A2A_0%,#050505_100%)]">
+      {/* 3D Canvas occupying the full screen */}
+      <div className="absolute inset-0 z-0">
         <Canvas 
-          camera={{ position: [0, 1.2, 4], fov: 40 }}
+          camera={{ position: [0, 0, 5], fov: 40 }}
           dpr={typeof window !== 'undefined' ? Math.min(window.devicePixelRatio, 3) : 2}
-          gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.2, powerPreference: "high-performance" }}
+          gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.1 }}
         >
-          {/* Intense Studio Lighting Setup */}
-          <ambientLight intensity={1.5} />
-          <spotLight position={[10, 15, 10]} angle={0.3} penumbra={1} intensity={4} castShadow />
-          <spotLight position={[-10, 10, -10]} angle={0.3} penumbra={1} intensity={2} />
-          <pointLight position={[0, 5, 0]} intensity={2} />
+          {/* Invisible HDRI to provide intense photorealistic reflections while background remains dark */}
+          <Environment preset="studio" blur={1} />
+          
+          <ambientLight intensity={0.5} />
+          {/* Key lights for jewelry */}
+          <spotLight position={[5, 10, 5]} angle={0.2} penumbra={0.8} intensity={5} castShadow />
+          <spotLight position={[-5, 5, -5]} angle={0.4} penumbra={1} intensity={2} />
           
           <Suspense fallback={null}>
             <RingModel {...config} />
-            <Environment preset="city" />
-            <ContactShadows position={[0, -1.5, 0]} opacity={0.8} scale={10} blur={2.5} far={4} color="#000000" />
           </Suspense>
-          <OrbitControls enablePan={false} minPolarAngle={Math.PI/4} maxPolarAngle={Math.PI/1.5} minDistance={2} maxDistance={6} />
+          
+          <OrbitControls enablePan={false} minPolarAngle={Math.PI/3} maxPolarAngle={Math.PI/1.5} minDistance={2} maxDistance={8} />
         </Canvas>
-        
-        <motion.div 
-          key={estimatedPrice}
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="absolute top-4 right-4 bg-vela-black/60 backdrop-blur-md px-5 py-2.5 rounded-full border border-vela-gold/30 shadow-lg"
-        >
-          <span className="text-vela-gold font-serif text-lg tracking-wide">${estimatedPrice.toLocaleString()}</span>
-        </motion.div>
       </div>
 
-      {/* Configurator Panel */}
-      <div className="bg-vela-dark border-t border-vela-gray/30 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-20">
-        {/* Tabs */}
-        <div className="flex overflow-x-auto scrollbar-hide px-4 pt-4 pb-2 border-b border-vela-gray/20">
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={cn(
-                "px-4 py-2 text-xs font-medium tracking-wider uppercase whitespace-nowrap transition-colors relative",
-                activeTab === tab.id ? "text-vela-gold" : "text-vela-light/50 hover:text-vela-light/80"
-              )}
+      {/* Floating Glassmorphic UI Panel (Tailwind UI guidelines) */}
+      <div className="pointer-events-none absolute inset-0 flex flex-col md:flex-row justify-end items-end md:items-start p-6 pt-24 z-20">
+        <div className="pointer-events-auto w-full md:w-96 bg-vela-black/40 backdrop-blur-2xl border border-white/10 rounded-3xl overflow-hidden shadow-2xl flex flex-col">
+          
+          {/* Price Header */}
+          <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/5">
+            <span className="text-white/60 text-xs tracking-widest uppercase">Estimated Value</span>
+            <motion.span 
+              key={estimatedPrice}
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="text-vela-gold font-serif text-2xl"
             >
-              {tab.label}
-              {activeTab === tab.id && (
-                <motion.div 
-                  layoutId="activeTab" 
-                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-vela-gold" 
-                />
-              )}
-            </button>
-          ))}
-        </div>
+              ${estimatedPrice.toLocaleString()}
+            </motion.span>
+          </div>
 
-        {/* Tab Content */}
-        <div className="p-6 min-h-[220px]">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-            >
-              {activeTab === 'metal' && (
-                <div className="grid grid-cols-4 gap-4">
-                  {metalOptions.map(m => (
-                    <button
-                      key={m.id}
-                      onClick={() => setConfig({...config, metal: m.id})}
-                      className="flex flex-col items-center gap-2 group"
-                    >
-                      <div className={cn(
-                        "w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg",
-                        m.color,
-                        config.metal === m.id ? "ring-2 ring-vela-gold ring-offset-2 ring-offset-vela-dark scale-110" : "opacity-70 group-hover:opacity-100 group-hover:scale-105"
-                      )}>
-                        {config.metal === m.id && <Check size={16} className={m.id === 'white gold' || m.id === 'platinum' ? 'text-black' : 'text-white'} />}
-                      </div>
-                      <span className={cn(
-                        "text-[10px] uppercase tracking-wider text-center",
-                        config.metal === m.id ? "text-vela-gold" : "text-vela-light/60"
-                      )}>{m.label}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
+          {/* Navigation Tabs */}
+          <div className="flex px-4 pt-4 pb-2">
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  "flex-1 px-2 py-3 text-xs tracking-widest uppercase whitespace-nowrap transition-colors relative text-center",
+                  activeTab === tab.id ? "text-vela-gold" : "text-white/40 hover:text-white/70"
+                )}
+              >
+                {tab.label}
+                {activeTab === tab.id && (
+                  <motion.div 
+                    layoutId="tab-indicator" 
+                    className="absolute bottom-0 left-1/4 right-1/4 h-px bg-vela-gold" 
+                  />
+                )}
+              </button>
+            ))}
+          </div>
 
-              {activeTab === 'band' && (
-                <div className="grid grid-cols-2 gap-4">
-                  {bandOptions.map(b => (
-                    <button
-                      key={b}
-                      onClick={() => setConfig({...config, bandStyle: b})}
-                      className={cn(
-                        "p-4 rounded-xl border transition-all duration-300 flex flex-col items-center gap-2",
-                        config.bandStyle === b ? "border-vela-gold bg-vela-gold/5" : "border-vela-gray/30 hover:border-vela-gray/60"
-                      )}
-                    >
-                      <span className="text-sm font-serif capitalize">{b}</span>
-                      <span className="text-[10px] text-vela-light/50 uppercase tracking-wider">
-                        {b === 'pave' ? '+$400' : 'Included'}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {activeTab === 'stone' && (
-                <div className="space-y-6">
-                  <div>
-                    <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
-                      {stoneOptions.map(s => (
+          {/* Configuration Area */}
+          <div className="p-6 h-64 overflow-y-auto scrollbar-hide">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, x: 10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                transition={{ duration: 0.3 }}
+              >
+                
+                {/* Metal Selection */}
+                {activeTab === 'metal' && (
+                  <div className="space-y-4">
+                    <p className="text-xs text-white/40 uppercase tracking-widest mb-4">Select Band Alloy</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {metalOptions.map(m => (
                         <button
-                          key={s.id}
-                          onClick={() => setConfig({...config, stone: s.id})}
-                          className="flex flex-col items-center gap-2 group min-w-[60px]"
+                          key={m.id}
+                          onClick={() => setConfig({...config, metal: m.id})}
+                          className={cn(
+                            "flex items-center gap-3 p-3 rounded-xl border transition-all duration-300",
+                            config.metal === m.id ? "border-vela-gold bg-vela-gold/10" : "border-white/5 hover:border-white/20 bg-white/5"
+                          )}
                         >
-                          <div className={cn(
-                            "w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg",
-                            s.color,
-                            config.stone === s.id ? "ring-2 ring-vela-gold ring-offset-2 ring-offset-vela-dark scale-110" : "opacity-70 group-hover:opacity-100 group-hover:scale-105"
-                          )}>
-                            {config.stone === s.id && s.id !== 'none' && <Check size={14} className={s.id === 'diamond' ? 'text-black' : 'text-white'} />}
-                          </div>
-                          <span className={cn(
-                            "text-[10px] uppercase tracking-wider text-center",
-                            config.stone === s.id ? "text-vela-gold" : "text-vela-light/60"
-                          )}>{s.label}</span>
+                          <div className={cn("w-6 h-6 rounded-full shadow-inner", m.color)} />
+                          <span className="text-xs text-white/80">{m.label}</span>
                         </button>
                       ))}
                     </div>
                   </div>
+                )}
 
-                  {config.stone !== 'none' && (
-                    <div className="pt-4 border-t border-vela-gray/20">
-                      <h4 className="text-[10px] text-vela-light/50 uppercase tracking-wider mb-3">Stone Shape</h4>
-                      <div className="flex gap-3">
-                        {shapeOptions.map(s => (
-                          <button
-                            key={s}
-                            onClick={() => setConfig({...config, shape: s})}
-                            className={cn(
-                              "px-4 py-2 rounded-full text-xs tracking-wider uppercase border transition-all",
-                              config.shape === s ? "border-vela-gold text-vela-gold bg-vela-gold/10" : "border-vela-gray/30 text-vela-light/70 hover:border-vela-light/50"
-                            )}
-                          >
-                            {s}
-                          </button>
-                        ))}
-                      </div>
+                {/* Stone Selection */}
+                {activeTab === 'stone' && (
+                  <div className="space-y-4">
+                    <p className="text-xs text-white/40 uppercase tracking-widest mb-4">Select Center Stone</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {stoneOptions.map(s => (
+                        <button
+                          key={s.id}
+                          onClick={() => setConfig({...config, stone: s.id})}
+                          className={cn(
+                            "flex items-center gap-3 p-3 rounded-xl border transition-all duration-300",
+                            config.stone === s.id ? "border-vela-gold bg-vela-gold/10" : "border-white/5 hover:border-white/20 bg-white/5"
+                          )}
+                        >
+                          <div className={cn("w-6 h-6 rounded-full shadow-inner", s.color)} />
+                          <span className="text-xs text-white/80">{s.label}</span>
+                        </button>
+                      ))}
                     </div>
-                  )}
-                </div>
-              )}
+                  </div>
+                )}
 
-              {activeTab === 'setting' && (
-                <div className="grid grid-cols-2 gap-4">
-                  {settingOptions.map(s => (
-                    <button
-                      key={s}
-                      onClick={() => setConfig({...config, settingStyle: s})}
-                      className={cn(
-                        "p-4 rounded-xl border transition-all duration-300 flex flex-col items-center gap-2",
-                        config.settingStyle === s ? "border-vela-gold bg-vela-gold/5" : "border-vela-gray/30 hover:border-vela-gray/60"
-                      )}
-                    >
-                      <span className="text-sm font-serif capitalize">{s}</span>
-                      <span className="text-[10px] text-vela-light/50 uppercase tracking-wider">
-                        {s === 'bezel' ? '+$150' : 'Included'}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
+                {/* Engraving */}
+                {activeTab === 'engrave' && (
+                  <div className="space-y-6">
+                    <p className="text-xs text-white/40 font-light leading-relaxed">
+                      Add a personal touch with a bespoke engraving on the inner band. (Max 20 chars)
+                    </p>
+                    <input
+                      type="text"
+                      maxLength={20}
+                      value={config.engraving}
+                      onChange={(e) => setConfig({...config, engraving: e.target.value})}
+                      placeholder="Forever Yours"
+                      className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-vela-gold/50 transition-colors placeholder:text-white/20"
+                    />
+                  </div>
+                )}
 
-              {activeTab === 'engrave' && (
-                <div className="space-y-4">
-                  <p className="text-xs text-vela-light/60 font-light">Add a personal touch with a custom engraving on the inside of the band. Maximum 20 characters.</p>
-                  <input
-                    type="text"
-                    maxLength={20}
-                    value={config.engraving}
-                    onChange={(e) => setConfig({...config, engraving: e.target.value})}
-                    placeholder="e.g. Forever Yours"
-                    className="w-full bg-vela-black border border-vela-gray/50 rounded-lg p-4 text-sm text-vela-light focus:outline-none focus:border-vela-gold/50 transition-colors"
-                  />
-                </div>
-              )}
-            </motion.div>
-          </AnimatePresence>
-        </div>
+              </motion.div>
+            </AnimatePresence>
+          </div>
 
-        <div className="p-4 pt-0 pb-24">
-          <button className="w-full bg-vela-gold text-vela-black py-4 rounded-xl font-medium tracking-widest uppercase text-xs hover:bg-vela-gold-muted transition-all hover:scale-[1.02] flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(251,222,147,0.2)]">
-            Save to Brief <ChevronRight size={16} />
-          </button>
+          {/* Action Button */}
+          <div className="p-6 bg-black/20 border-t border-white/5">
+            <button className="w-full bg-vela-gold text-black py-4 rounded-xl font-medium tracking-widest uppercase text-xs hover:bg-white transition-colors flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(251,222,147,0.15)]">
+              Add to Brief <ChevronRight size={16} />
+            </button>
+          </div>
+
         </div>
       </div>
     </div>
