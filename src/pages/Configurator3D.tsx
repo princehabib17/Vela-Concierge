@@ -1,10 +1,12 @@
 import { useState, Suspense, useRef, useMemo, Component, type ReactNode } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Environment, ContactShadows, Text, MeshTransmissionMaterial, Float, Instances, Instance } from '@react-three/drei';
+import { OrbitControls, Environment, Text, Float } from '@react-three/drei';
 import * as THREE from 'three';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
-import { Check, ChevronRight } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
+import { useLoader } from '@react-three/fiber';
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 
 class CanvasErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
   state = { hasError: false };
@@ -33,67 +35,93 @@ class CanvasErrorBoundary extends Component<{ children: ReactNode }, { hasError:
 function RingModel({ metal, stone, shape, engraving, bandStyle, settingStyle }: any) {
   const group = useRef<THREE.Group>(null);
   
-  // High-end metal materials (highly polished, reflective)
+  // Load the external OBJ file
+  const obj = useLoader(OBJLoader, '/ring.obj');
+
+  // Define ultra-realistic physical materials
   const metalProps = { 
     metalness: 1, 
-    roughness: 0.02, // Extremely polished
+    roughness: 0.05, // polished luxury metal
     clearcoat: 1, 
-    clearcoatRoughness: 0.05, 
+    clearcoatRoughness: 0.1, 
     envMapIntensity: 2.5 
   };
   
   const materials = useMemo(() => ({
     'yellow gold': new THREE.MeshPhysicalMaterial({ color: '#E5C07B', ...metalProps }),
     'rose gold': new THREE.MeshPhysicalMaterial({ color: '#DDA7A5', ...metalProps }),
-    'white gold': new THREE.MeshPhysicalMaterial({ color: '#F3F3F3', ...metalProps }),
+    'white gold': new THREE.MeshPhysicalMaterial({ color: '#F8F9FA', ...metalProps, roughness: 0.03 }),
     'platinum': new THREE.MeshPhysicalMaterial({ color: '#E5E4E2', ...metalProps, roughness: 0.01, envMapIntensity: 3 }),
-    'silver': new THREE.MeshPhysicalMaterial({ color: '#C0C0C0', ...metalProps, roughness: 0.05 }),
   }), []);
 
-  // Setting material: White gold for yellow/rose bands to make the diamond pop (classic luxury technique)
+  // Setting material: Two-tone setting (classic luxury technique: white gold prongs for colored bands)
   const settingMaterial = (metal === 'yellow gold' || metal === 'rose gold')
     ? materials['white gold']
     : materials[metal as keyof typeof materials];
 
   const activeMetal = materials[metal as keyof typeof materials] || materials['yellow gold'];
 
-  // Advanced Stone properties for MeshTransmissionMaterial
   const stoneProps = useMemo(() => ({
-    'diamond': { color: '#ffffff', transmission: 1, ior: 2.417, thickness: 1.2, roughness: 0, chromaticAberration: 0.06, backside: true },
-    'emerald': { color: '#50C878', transmission: 1, ior: 1.577, thickness: 1.2, roughness: 0, chromaticAberration: 0.02, backside: true },
-    'sapphire': { color: '#0F52BA', transmission: 1, ior: 1.762, thickness: 1.2, roughness: 0, chromaticAberration: 0.02, backside: true },
-    'ruby': { color: '#E0115F', transmission: 1, ior: 1.762, thickness: 1.2, roughness: 0, chromaticAberration: 0.02, backside: true },
+    'diamond': { color: '#ffffff', transmission: 1, ior: 2.417, thickness: 1.5, roughness: 0, dispersion: 1.5 },
+    'emerald': { color: '#50C878', transmission: 1, ior: 1.577, thickness: 1.5, roughness: 0, dispersion: 0.8 },
+    'sapphire': { color: '#0F52BA', transmission: 1, ior: 1.762, thickness: 1.5, roughness: 0, dispersion: 0.5 },
+    'ruby': { color: '#E0115F', transmission: 1, ior: 1.762, thickness: 1.5, roughness: 0, dispersion: 0.5 },
   }), []);
   
   const activeStoneProps = stoneProps[stone as keyof typeof stoneProps] || stoneProps['diamond'];
 
-  // Precise Diamond Profile (Lathe Geometry Points) for a Brilliant Cut
-  const diamondPoints = useMemo(() => {
-    return [
-      new THREE.Vector2(0, -0.3),     // Culet (bottom point)
-      new THREE.Vector2(0.35, 0.05),  // Girdle bottom
-      new THREE.Vector2(0.35, 0.1),   // Girdle top
-      new THREE.Vector2(0.2, 0.2),    // Table edge
-      new THREE.Vector2(0, 0.2)       // Table center (top flat part)
-    ];
-  }, []);
+  const stoneMaterial = useMemo(() => {
+    return new THREE.MeshPhysicalMaterial({
+      ...activeStoneProps,
+      envMapIntensity: 4,
+      transparent: true,
+      side: THREE.DoubleSide
+    });
+  }, [activeStoneProps]);
 
-  // Shared geometry and material for Pavé diamonds
-  const paveGeometry = useMemo(() => new THREE.OctahedronGeometry(0.035, 1), []);
-  const paveMaterial = useMemo(() => new THREE.MeshPhysicalMaterial({
-    color: '#ffffff',
-    transmission: 0.9,
-    opacity: 1,
-    metalness: 0.1,
-    roughness: 0,
-    ior: 2.4,
-    thickness: 0.5,
-    envMapIntensity: 2.5,
-  }), []);
+  // Clone the OBJ and map materials dynamically based on the discovered internal material names
+  const objClone = useMemo(() => {
+    const clone = obj.clone();
+    
+    clone.traverse((child: any) => {
+      if (child.isMesh) {
+        // Essential for shadows/reflections
+        child.castShadow = true;
+        child.receiveShadow = true;
+        
+        // Ensure smooth shading for metal and somewhat flat for facets if necessary
+        child.geometry.computeVertexNormals();
+
+        const matName = child.material.name;
+        // The downloaded OBJ uses specific material names
+        // _Material_1 is usually the main band
+        if (matName.includes("Material_1")) {
+           child.material = activeMetal;
+        } 
+        // _Material_28 often represents the setting / crown
+        else if (matName.includes("Material_28")) {
+           child.material = settingMaterial;
+        } 
+        // Assume anything else (Material_2, etc) are diamonds (center and pave)
+        else {
+           child.material = stoneMaterial;
+        }
+      }
+    });
+
+    // Center and scale the geometry for our viewport
+    const box = new THREE.Box3().setFromObject(clone);
+    const center = box.getCenter(new THREE.Vector3());
+    clone.position.sub(center); // Center it
+    clone.position.y += 0.8; // Lift
+    clone.scale.set(0.08, 0.08, 0.08); // Adjust scale of raw OBJ to fit canvas
+
+    return clone;
+  }, [obj, activeMetal, settingMaterial, stoneMaterial]);
 
   useFrame(() => {
     if (group.current) {
-      group.current.rotation.y += 0.003; // Elegant, slow rotation
+      group.current.rotation.y += 0.005; // Elegant rotation
     }
   });
 
@@ -193,12 +221,12 @@ function RingModel({ metal, stone, shape, engraving, bandStyle, settingStyle }: 
           </group>
         )}
 
-        {/* Engraving */}
+        {/* Dynamic Engraving overlaid on the geometry's relative coord system */}
         {engraving && (
-          <Text
-            position={[0, -0.88, 0.13]}
+           <Text
+            position={[-0.2, 0.6, 0.9]}
             rotation={[0, 0, 0]}
-            fontSize={0.06}
+            fontSize={0.04}
             color="#000000"
             anchorX="center"
             anchorY="middle"
@@ -217,19 +245,14 @@ export default function Configurator3D() {
   const [view, setView] = useState<'hero' | 'top' | 'profile'>('hero');
   const [config, setConfig] = useState({
     metal: 'yellow gold',
-    bandStyle: 'plain',
     stone: 'diamond',
-    shape: 'round',
-    settingStyle: 'solitaire',
     engraving: ''
   });
 
   const tabs = [
     { id: 'metal', label: 'Metal' },
-    { id: 'band', label: 'Band' },
     { id: 'stone', label: 'Stone' },
-    { id: 'setting', label: 'Setting' },
-    { id: 'engrave', label: 'Engrave' }
+    { id: 'engrave', label: 'Engraving' }
   ];
 
   const metalOptions = [
@@ -244,7 +267,6 @@ export default function Configurator3D() {
     { id: 'emerald', label: 'Emerald', color: 'bg-gradient-to-br from-[#50C878] to-[#043927]' },
     { id: 'sapphire', label: 'Sapphire', color: 'bg-gradient-to-br from-[#0F52BA] to-[#000080]' },
     { id: 'ruby', label: 'Ruby', color: 'bg-gradient-to-br from-[#E0115F] to-[#8B0000]' },
-    { id: 'none', label: 'No Stone', color: 'bg-transparent border border-dashed border-vela-gray' },
   ];
 
   const shapeOptions = ['round', 'emerald', 'oval'];
@@ -257,13 +279,11 @@ export default function Configurator3D() {
   } as const;
 
   // Calculate estimated price
-  const basePrice = 1000;
-  const metalPrice = config.metal === 'platinum' ? 500 : 0;
-  const bandPrice = config.bandStyle === 'pave' ? 400 : 0;
-  const settingPrice = config.settingStyle === 'bezel' ? 150 : 0;
-  const stonePrice = config.stone === 'diamond' ? 2000 : config.stone === 'none' ? 0 : 1200;
+  const basePrice = 2500;
+  const metalPrice = config.metal === 'platinum' ? 800 : 0;
+  const stonePrice = config.stone === 'diamond' ? 4500 : 1800;
   
-  const estimatedPrice = basePrice + metalPrice + bandPrice + settingPrice + stonePrice;
+  const estimatedPrice = basePrice + metalPrice + stonePrice;
 
   return (
     <div className="h-full flex flex-col bg-[#f7f7f5] text-[#111111]">
@@ -398,15 +418,19 @@ export default function Configurator3D() {
                 </div>
               )}
 
-              {activeTab === 'stone' && (
-                <div className="space-y-6">
-                  <div>
-                    <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+                {/* Stone Selection */}
+                {activeTab === 'stone' && (
+                  <div className="space-y-4">
+                    <p className="text-xs text-white/40 uppercase tracking-widest mb-4">Select Center Stone</p>
+                    <div className="grid grid-cols-2 gap-3">
                       {stoneOptions.map(s => (
                         <button
                           key={s.id}
                           onClick={() => setConfig({...config, stone: s.id})}
-                          className="flex flex-col items-center gap-2 group min-w-[60px]"
+                          className={cn(
+                            "flex items-center gap-3 p-3 rounded-xl border transition-all duration-300",
+                            config.stone === s.id ? "border-vela-gold bg-vela-gold/10" : "border-white/5 hover:border-white/20 bg-white/5"
+                          )}
                         >
                           <div className={cn(
                             "w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg",
@@ -423,6 +447,7 @@ export default function Configurator3D() {
                       ))}
                     </div>
                   </div>
+                )}
 
                   {config.stone !== 'none' && (
                     <div className="pt-4 border-t border-black/10">

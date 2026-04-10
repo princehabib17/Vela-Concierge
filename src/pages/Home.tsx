@@ -1,6 +1,53 @@
 import { Link } from 'react-router-dom';
 import { Sparkles, Box, Camera, Map, ArrowRight } from 'lucide-react';
 import { motion } from 'motion/react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { Environment, ContactShadows, Float, MeshTransmissionMaterial } from '@react-three/drei';
+import * as THREE from 'three';
+import { useMemo, useRef } from 'react';
+
+// A dazzling floating diamond component for the Hero section
+function HeroDiamond() {
+  const mesh = useRef<THREE.Mesh>(null);
+  
+  useFrame((state, delta) => {
+    if (mesh.current) {
+      mesh.current.rotation.y += delta * 0.2;
+      mesh.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.5) * 0.1;
+    }
+  });
+
+  const diamondPoints = useMemo(() => {
+    return [
+      new THREE.Vector2(0, -0.4),     // Culet
+      new THREE.Vector2(0.4, 0.05),   // Girdle bottom
+      new THREE.Vector2(0.4, 0.1),    // Girdle top
+      new THREE.Vector2(0.25, 0.25),  // Table edge
+      new THREE.Vector2(0, 0.25)      // Table center
+    ];
+  }, []);
+
+  return (
+    <Float speed={2} rotationIntensity={0.2} floatIntensity={0.5}>
+      <mesh ref={mesh} position={[0, -0.1, 0]}>
+        <latheGeometry args={[diamondPoints, 32]} />
+        <MeshTransmissionMaterial 
+          color="#ffffff" 
+          transmission={1} 
+          ior={2.417} 
+          thickness={1.5} 
+          roughness={0} 
+          chromaticAberration={0.08} 
+          backside={true}
+          clearcoat={1}
+          clearcoatRoughness={0}
+          envMapIntensity={2}
+          resolution={1024}
+        />
+      </mesh>
+    </Float>
+  );
+}
 
 export default function Home() {
   return (
@@ -11,25 +58,35 @@ export default function Home() {
       className="pb-6 h-full overflow-y-auto"
     >
       {/* Hero Section */}
-      <section className="relative h-[60vh] w-full mb-8">
+      <section className="relative h-[60vh] w-full mb-8 overflow-hidden rounded-b-3xl">
         <div className="absolute inset-0 bg-vela-black">
-          <img 
-            src="https://images.unsplash.com/photo-1599643478514-4a888f1971c2?q=80&w=1200&auto=format&fit=crop" 
-            alt="Vela Bespoke Jewellery" 
-            className="w-full h-full object-cover opacity-60"
-            referrerPolicy="no-referrer"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-vela-black via-vela-black/20 to-transparent" />
+          {/* Stunning 3D Canvas Background */}
+          <Canvas 
+            camera={{ position: [0, 0, 2.5], fov: 45 }}
+            dpr={typeof window !== 'undefined' ? Math.min(window.devicePixelRatio, 2) : 2}
+            className="w-full h-full"
+          >
+            <ambientLight intensity={1.2} />
+            <spotLight position={[5, 10, 5]} angle={0.25} penumbra={1} intensity={6} color="#FFE6CD" />
+            <spotLight position={[-5, 8, -5]} angle={0.3} penumbra={1} intensity={3} color="#FFFFFF" />
+            <pointLight position={[0, -3, 0]} intensity={2} color="#DDA7A5" />
+            
+            <HeroDiamond />
+            
+            <Environment preset="city" />
+            <ContactShadows position={[0, -1, 0]} opacity={0.6} scale={10} blur={2.5} far={4} color="#000000" />
+          </Canvas>
+          <div className="absolute inset-0 bg-gradient-to-t from-vela-black via-vela-black/10 to-transparent pointer-events-none" />
         </div>
         
-        <div className="absolute bottom-0 left-0 right-0 p-6 flex flex-col justify-end">
+        <div className="absolute bottom-0 left-0 right-0 p-6 flex flex-col justify-end pointer-events-none">
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.3, duration: 0.8 }}
           >
             <h2 className="text-sm text-vela-gold tracking-[0.2em] uppercase mb-3">The Atelier</h2>
-            <h1 className="text-4xl font-serif leading-tight mb-4 text-vela-light">
+            <h1 className="text-4xl font-serif leading-tight mb-4 text-vela-light text-shadow-sm">
               Craft Your <br/><span className="italic text-vela-light/90">Legacy</span>
             </h1>
             <p className="text-vela-light/70 font-light text-sm max-w-[280px] leading-relaxed">

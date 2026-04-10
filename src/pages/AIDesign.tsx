@@ -4,8 +4,14 @@ import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
 import { GoogleGenAI } from '@google/genai';
 
-// Initialize Gemini API
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+// Initialize Gemini API safely
+let ai: GoogleGenAI;
+try {
+  ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || 'MISSING_KEY' });
+} catch (e) {
+  console.warn("GoogleGenAI init failed:", e);
+  ai = {} as GoogleGenAI;
+}
 
 export default function AIDesign() {
   const [prompt, setPrompt] = useState('');
