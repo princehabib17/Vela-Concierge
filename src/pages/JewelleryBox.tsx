@@ -23,7 +23,7 @@ export default function JewelleryBox() {
   ];
 
   return (
-    <div className="p-6 space-y-8 animate-in fade-in duration-500 pb-24">
+    <div className="h-full min-h-0 space-y-8 overflow-y-auto p-6 pb-24 animate-in fade-in duration-500">
       <div className="flex justify-between items-end">
         <div className="space-y-2">
           <h2 className="text-2xl font-serif text-vela-gold">Digital Jewellery Box</h2>

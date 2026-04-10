@@ -1,9 +1,11 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Cardo:wght@400;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Playfair Display", ui-serif, Georgia, serif;
+  --font-lux-ui: "Gotham", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-lux-display: "Cardon", "Cardo", "Playfair Display", ui-serif, Georgia, serif;
   
   --color-vela-black: #050505;
   --color-vela-dark: #111111;
@@ -14,11 +16,96 @@
 }
 
 @layer base {
+  html,
+  body {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+  }
+
+  #root {
+    height: 100%;
+    min-height: 100dvh;
+  }
+
   body {
     @apply bg-vela-black text-vela-light font-sans antialiased;
   }
   
   h1, h2, h3, h4, h5, h6 {
     @apply font-serif font-normal tracking-wide;
+  }
+}
+
+@layer base {
+  :root {
+    --lux-bg: #f1f1f1;
+    --lux-surface: #ffffff;
+    --lux-text-primary: #121212;
+    --lux-text-muted: #707070;
+    --lux-accent: #fbde93;
+    --lux-border: #d8d8d8;
+    --lux-border-strong: #121212;
+
+    --lux-space-8: 8px;
+    --lux-space-12: 12px;
+    --lux-space-16: 16px;
+    --lux-space-24: 24px;
+    --lux-space-32: 32px;
+
+    --lux-radius-sm: 8px;
+    --lux-radius-md: 12px;
+    --lux-radius-lg: 16px;
+    --lux-pill: 999px;
+
+    --lux-shadow-soft: 0 8px 24px rgba(18, 18, 18, 0.08);
+  }
+}
+
+@layer utilities {
+  .lux-bg {
+    background-color: var(--lux-bg);
+  }
+
+  .lux-surface {
+    background-color: var(--lux-surface);
+  }
+
+  .lux-text {
+    color: var(--lux-text-primary);
+  }
+
+  .lux-muted {
+    color: var(--lux-text-muted);
+  }
+
+  .lux-accent {
+    color: #9b7a2a;
+  }
+
+  .lux-border {
+    border-color: var(--lux-border);
+  }
+
+  .lux-ui {
+    font-family: var(--font-lux-ui);
+    letter-spacing: 0.04em;
+  }
+
+  .lux-display {
+    font-family: var(--font-lux-display);
+    letter-spacing: 0.02em;
+  }
+
+  /* Hide scrollbars but keep touch/mouse scroll (mobile studio panels) */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
   }
 }

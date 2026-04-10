@@ -48,7 +48,7 @@ export default function JourneyTracker() {
   ];
 
   return (
-    <div className="p-6 pt-12 h-full overflow-y-auto pb-24">
+    <div className="h-full min-h-0 overflow-y-auto p-6 pt-12 pb-24">
       <header className="mb-8">
         <h1 className="text-2xl font-serif mb-2">Your Vela Journey</h1>
         <p className="text-vela-light/60 text-sm font-light">Order #VJ-8842</p>

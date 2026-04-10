@@ -13,6 +13,7 @@ import JourneyTracker from './pages/JourneyTracker';
 import JewelleryBox from './pages/JewelleryBox';
 import RingSizer from './pages/RingSizer';
 import Profile from './pages/Profile';
+import Wishlist from './pages/Wishlist';
 
 function SplashScreen() {
   const [isVisible, setIsVisible] = useState(true);
@@ -87,7 +88,7 @@ function Navigation() {
 
 function Header() {
   return (
-    <header className="sticky top-0 z-40 bg-gradient-to-b from-vela-black/90 to-vela-black/0 backdrop-blur-sm px-6 py-4 flex justify-between items-center">
+    <header className="sticky top-0 z-40 shrink-0 bg-gradient-to-b from-vela-black/90 to-vela-black/0 backdrop-blur-sm px-6 py-4 flex justify-between items-center">
       <div className="flex items-center gap-2">
         <Diamond className="text-vela-gold" size={20} strokeWidth={1.5} />
         <h1 className="text-xl font-serif tracking-widest uppercase text-vela-light">Vela</h1>
@@ -111,9 +112,9 @@ export default function App() {
   return (
     <BrowserRouter>
       <SplashScreen />
-      <div className="min-h-screen bg-vela-black text-vela-light flex flex-col font-sans pb-20">
+      <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-vela-black text-vela-light font-sans">
         <Header />
-        <main className="flex-1 w-full max-w-md mx-auto relative">
+        <main className="relative flex min-h-0 flex-1 flex-col w-full max-w-md mx-auto overflow-hidden pb-20">
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/design/ai" element={<AIDesign />} />
@@ -123,6 +124,7 @@ export default function App() {
             <Route path="/jewellery-box" element={<JewelleryBox />} />
             <Route path="/sizer" element={<RingSizer />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/wishlist" element={<Wishlist />} />
           </Routes>
         </main>
         <Navigation />

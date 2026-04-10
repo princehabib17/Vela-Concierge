@@ -3,7 +3,7 @@ import { Settings, ChevronRight, Box, Ruler, Heart } from 'lucide-react';
 
 export default function Profile() {
   return (
-    <div className="p-6 pt-12 h-full overflow-y-auto pb-24">
+    <div className="h-full min-h-0 overflow-y-auto p-6 pt-12 pb-24">
       <header className="flex justify-between items-center mb-8">
         <h1 className="text-2xl font-serif">Profile</h1>
         <button className="p-2 hover:bg-vela-dark rounded-full transition-colors">
@@ -48,7 +48,10 @@ export default function Profile() {
           <ChevronRight size={18} className="text-vela-light/30 group-hover:text-vela-gold transition-colors" />
         </Link>
 
-        <button type="button" className="w-full bg-vela-dark p-4 rounded-lg border border-vela-gray/30 flex items-center justify-between hover:border-vela-gold/50 transition-colors group">
+        <Link
+          to="/wishlist"
+          className="bg-vela-dark p-4 rounded-lg border border-vela-gray/30 flex w-full items-center justify-between transition-colors hover:border-vela-gold/50 group"
+        >
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 rounded-full bg-vela-black flex items-center justify-center">
               <Heart className="text-vela-gold" size={18} />
@@ -59,7 +62,7 @@ export default function Profile() {
             </div>
           </div>
           <ChevronRight size={18} className="text-vela-light/30 group-hover:text-vela-gold transition-colors" />
-        </button>
+        </Link>
       </div>
 
       <div className="mt-12 pt-6 border-t border-vela-gray/30">

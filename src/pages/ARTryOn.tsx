@@ -32,7 +32,7 @@ export default function ARTryOn() {
 
   if (hasPermission === false) {
     return (
-      <div className="p-6 flex flex-col items-center justify-center h-[60vh] text-center space-y-4">
+      <div className="flex h-full min-h-0 flex-col items-center justify-center overflow-y-auto p-6 text-center space-y-4">
         <AlertCircle className="text-vela-gold" size={48} />
         <h2 className="text-xl font-serif">Camera Access Required</h2>
         <p className="text-vela-light/70 font-light text-sm">
@@ -43,7 +43,7 @@ export default function ARTryOn() {
   }
 
   return (
-    <div className="relative h-[calc(100vh-140px)] bg-vela-black overflow-hidden animate-in fade-in duration-500">
+    <div className="relative h-full min-h-0 overflow-hidden bg-vela-black animate-in fade-in duration-500">
       {/* Camera Feed Placeholder / Video Element */}
       <video 
         ref={videoRef}
