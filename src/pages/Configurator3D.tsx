@@ -5,8 +5,7 @@ import * as THREE from 'three';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChevronRight } from 'lucide-react';
-import { useLoader } from '@react-three/fiber';
-import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
+import { useFrame } from '@react-three/fiber';
 
 class CanvasErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
   state = { hasError: false };
@@ -35,8 +34,7 @@ class CanvasErrorBoundary extends Component<{ children: ReactNode }, { hasError:
 function RingModel({ metal, stone, shape, engraving, bandStyle, settingStyle }: any) {
   const group = useRef<THREE.Group>(null);
   
-  // Load the external OBJ file
-  const obj = useLoader(OBJLoader, '/ring.obj');
+
 
   // Define ultra-realistic physical materials
   const metalProps = { 
@@ -79,45 +77,7 @@ function RingModel({ metal, stone, shape, engraving, bandStyle, settingStyle }: 
     });
   }, [activeStoneProps]);
 
-  // Clone the OBJ and map materials dynamically based on the discovered internal material names
-  const objClone = useMemo(() => {
-    const clone = obj.clone();
-    
-    clone.traverse((child: any) => {
-      if (child.isMesh) {
-        // Essential for shadows/reflections
-        child.castShadow = true;
-        child.receiveShadow = true;
-        
-        // Ensure smooth shading for metal and somewhat flat for facets if necessary
-        child.geometry.computeVertexNormals();
 
-        const matName = child.material.name;
-        // The downloaded OBJ uses specific material names
-        // _Material_1 is usually the main band
-        if (matName.includes("Material_1")) {
-           child.material = activeMetal;
-        } 
-        // _Material_28 often represents the setting / crown
-        else if (matName.includes("Material_28")) {
-           child.material = settingMaterial;
-        } 
-        // Assume anything else (Material_2, etc) are diamonds (center and pave)
-        else {
-           child.material = stoneMaterial;
-        }
-      }
-    });
-
-    // Center and scale the geometry for our viewport
-    const box = new THREE.Box3().setFromObject(clone);
-    const center = box.getCenter(new THREE.Vector3());
-    clone.position.sub(center); // Center it
-    clone.position.y += 0.8; // Lift
-    clone.scale.set(0.08, 0.08, 0.08); // Adjust scale of raw OBJ to fit canvas
-
-    return clone;
-  }, [obj, activeMetal, settingMaterial, stoneMaterial]);
 
   useFrame(() => {
     if (group.current) {
@@ -161,6 +121,8 @@ function RingModel({ metal, stone, shape, engraving, bandStyle, settingStyle }: 
             })}
           </Instances>
         )}
+
+
 
         {/* Setting & Main Stone */}
         {stone !== 'none' && (
