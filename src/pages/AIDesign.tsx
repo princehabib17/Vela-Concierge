@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Sparkles, ArrowRight, RefreshCw, Heart } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
+import { PageShell } from '@/components/shell/PageShell';
 import { GoogleGenAI } from '@google/genai';
 
 // Initialize Gemini API safely
@@ -62,21 +63,21 @@ export default function AIDesign() {
   };
 
   return (
-    <div className="flex min-h-0 h-full flex-col overflow-y-auto p-6 pt-12">
-      <header className="mb-8">
-        <h1 className="text-2xl font-serif mb-2">AI Design Studio</h1>
-        <p className="text-vela-light/60 text-sm font-light">Describe your dream ring, and our AI will visualize it for you.</p>
-      </header>
-
-      <div className="flex-1 flex flex-col">
+    <PageShell
+      kicker="Concepts"
+      title="AI Design Studio"
+      subtitle="Describe your dream ring. We translate your words into visual directions you can refine with Paul."
+    >
+      <div className="flex min-h-0 flex-1 flex-col">
         <div className="relative mb-6">
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             placeholder="e.g. Rose gold oval sapphire, delicate pavé band, under $3,000..."
-            className="w-full bg-vela-dark border border-vela-gray/50 rounded-lg p-4 text-sm text-vela-light placeholder:text-vela-light/30 focus:outline-none focus:border-vela-gold/50 min-h-[120px] resize-none"
+            className="vela-type-body min-h-[120px] w-full resize-none rounded-xl border border-vela-gray/30 bg-vela-dark p-4 text-vela-light placeholder:text-vela-light/35 focus:border-vela-gold/45 focus:outline-none"
           />
-          <button 
+          <button
+            type="button"
             onClick={generateImages}
             disabled={!prompt || isGenerating}
             className="absolute bottom-4 right-4 bg-vela-gold text-vela-black p-3 rounded-full disabled:opacity-50 disabled:cursor-not-allowed hover:bg-vela-gold-muted transition-all hover:scale-105"
@@ -86,13 +87,14 @@ export default function AIDesign() {
         </div>
 
         {!images.length && !isGenerating && (
-          <div className="space-y-3">
-            <p className="text-xs text-vela-light/50 uppercase tracking-wider">Suggestions</p>
+          <div className="vela-stack-tight">
+            <p className="vela-kicker mb-3">Suggestions</p>
             {suggestions.map((sug, i) => (
               <button
                 key={i}
+                type="button"
                 onClick={() => setPrompt(sug)}
-                className="block w-full text-left p-4 rounded-lg border border-vela-gray/30 text-sm text-vela-light/80 hover:border-vela-gold/30 hover:text-vela-gold hover:bg-vela-dark transition-all"
+                className="vela-type-body block w-full rounded-xl border border-vela-gray/25 bg-vela-dark/40 p-4 text-left text-vela-light/80 transition-all hover:border-vela-gold/35 hover:bg-vela-dark hover:text-vela-gold"
               >
                 {sug}
               </button>
@@ -103,7 +105,7 @@ export default function AIDesign() {
         {isGenerating && (
           <div className="flex-1 flex flex-col items-center justify-center text-vela-gold">
             <Sparkles className="animate-pulse mb-4" size={32} strokeWidth={1} />
-            <p className="text-sm font-serif italic">Visualizing your design...</p>
+            <p className="font-serif text-sm font-normal italic text-vela-gold/90">Visualizing your design…</p>
           </div>
         )}
 
@@ -113,7 +115,7 @@ export default function AIDesign() {
             animate={{ opacity: 1, y: 0 }}
             className="flex-1 flex flex-col"
           >
-            <div className="grid grid-cols-2 gap-3 mb-6">
+            <div className="mb-6 grid grid-cols-2 gap-3">
               {images.map((img, i) => (
                 <div 
                   key={i}
@@ -139,10 +141,11 @@ export default function AIDesign() {
 
             <div className="mt-auto pt-4">
               <motion.button
+                type="button"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: selectedImage !== null ? 1 : 0.5 }}
                 disabled={selectedImage === null}
-                className="w-full bg-vela-gold text-vela-black py-4 rounded-lg font-medium tracking-wide uppercase text-sm hover:bg-vela-gold-muted transition-colors disabled:cursor-not-allowed"
+                className="vela-btn-primary w-full disabled:opacity-50"
               >
                 {selectedImage !== null ? 'Save to Order Brief' : 'Select a Design'}
               </motion.button>
@@ -150,6 +153,6 @@ export default function AIDesign() {
           </motion.div>
         )}
       </div>
-    </div>
+    </PageShell>
   );
 }

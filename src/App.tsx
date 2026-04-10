@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Home as HomeIcon, Sparkles, Box, Camera, Map, Ruler, Diamond, User } from 'lucide-react';
-import { motion } from 'motion/react';
+import gsap from 'gsap';
 import { cn } from './lib/utils';
 
 // Components for pages
@@ -16,40 +16,85 @@ import Profile from './pages/Profile';
 import Wishlist from './pages/Wishlist';
 
 function SplashScreen() {
-  /** visible → fading (pointer-events off so UI is usable while overlay fades) → unmounted */
-  const [phase, setPhase] = useState<'visible' | 'fading' | 'off'>('visible');
+  const [gone, setGone] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const diamondRef = useRef<HTMLDivElement>(null);
+  const subtitleRef = useRef<HTMLParagraphElement>(null);
 
   useEffect(() => {
-    const startFade = setTimeout(() => setPhase('fading'), 2400);
-    const remove = setTimeout(() => setPhase('off'), 2400 + 800);
-    return () => {
-      clearTimeout(startFade);
-      clearTimeout(remove);
-    };
+    const ctx = gsap.context(() => {
+      const tl = gsap.timeline({
+        onComplete() {
+          // exit: blur + fade the whole screen out
+          gsap.to(rootRef.current, {
+            opacity: 0,
+            filter: 'blur(8px)',
+            duration: 0.9,
+            ease: 'power2.inOut',
+            delay: 0.6,
+            onComplete: () => setGone(true),
+          });
+        },
+      });
+
+      // 1. Diamond materialises
+      tl.fromTo(
+        diamondRef.current,
+        { scale: 0.5, opacity: 0, filter: 'blur(16px)', rotate: -15 },
+        { scale: 1, opacity: 1, filter: 'blur(0px)', rotate: 0, duration: 1.1, ease: 'expo.out' },
+      );
+
+      // 2. "VELA" letters stagger in
+      tl.fromTo(
+        '.splash-letter',
+        { y: 24, opacity: 0, filter: 'blur(8px)' },
+        { y: 0, opacity: 1, filter: 'blur(0px)', duration: 0.7, stagger: 0.09, ease: 'power3.out' },
+        '-=0.55',
+      );
+
+      // 3. Subtitle rises
+      tl.fromTo(
+        subtitleRef.current,
+        { y: 10, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.7, ease: 'power2.out' },
+        '-=0.3',
+      );
+
+      // 4. Diamond subtle pulse while holding
+      tl.to(diamondRef.current, {
+        scale: 1.06,
+        duration: 0.9,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: 1,
+      }, '+=0.2');
+    }, rootRef);
+
+    return () => ctx.revert();
   }, []);
 
-  if (phase === 'off') return null;
+  if (gone) return null;
 
   return (
-    <motion.div
-      aria-hidden={phase === 'fading'}
-      initial={{ opacity: 1 }}
-      animate={{ opacity: phase === 'fading' ? 0 : 1 }}
-      transition={{ duration: 0.8, ease: 'easeInOut' }}
-      className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-vela-black"
-      style={{ pointerEvents: phase === 'fading' ? 'none' : 'auto' }}
+    <div
+      ref={rootRef}
+      aria-hidden
+      className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-vela-black pointer-events-none"
     >
-      <motion.div
-        initial={{ scale: 0.9, opacity: 0, filter: 'blur(10px)' }}
-        animate={{ scale: 1, opacity: 1, filter: 'blur(0px)' }}
-        transition={{ duration: 1.5, ease: 'easeOut' }}
-        className="flex flex-col items-center"
-      >
-        <Diamond className="mb-8 text-vela-gold" size={48} strokeWidth={1} />
-        <h1 className="mb-4 ml-3 text-5xl font-serif uppercase tracking-[0.3em] text-vela-gold">Vela</h1>
-        <p className="ml-1 text-xs font-light uppercase tracking-[0.4em] text-vela-light/60">Bespoke Jewellers</p>
-      </motion.div>
-    </motion.div>
+      <div className="flex flex-col items-center">
+        <div ref={diamondRef} className="mb-8">
+          <Diamond className="text-vela-gold drop-shadow-[0_0_18px_rgba(251,222,147,0.4)]" size={48} strokeWidth={1} />
+        </div>
+        <h1 className="mb-4 flex font-serif text-5xl uppercase tracking-[0.28em] text-vela-gold">
+          {'VELA'.split('').map((ch, i) => (
+            <span key={i} className="splash-letter inline-block">{ch}</span>
+          ))}
+        </h1>
+        <p ref={subtitleRef} className="text-xs font-light uppercase tracking-[0.4em] text-vela-light/60">
+          Bespoke Jewellers
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -65,8 +110,12 @@ function Navigation() {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-vela-black/90 backdrop-blur-lg border-t border-vela-gray/30 pb-safe pt-2 px-6 z-50">
-      <div className="flex justify-between items-center max-w-md mx-auto">
+    <nav
+      className="fixed bottom-0 left-0 right-0 z-50 border-t border-vela-gray/20 bg-vela-black/95 backdrop-blur-xl"
+      style={{ paddingBottom: 'max(0.35rem, env(safe-area-inset-bottom))' }}
+      aria-label="Primary"
+    >
+      <div className="mx-auto flex max-w-md items-end justify-between px-2 pt-2.5">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
           const Icon = item.icon;
@@ -75,12 +124,21 @@ function Navigation() {
               key={item.path} 
               to={item.path}
               className={cn(
-                "flex flex-col items-center gap-1 p-2 transition-colors",
-                isActive ? "text-vela-gold" : "text-vela-light/40 hover:text-vela-light"
+                'flex min-w-[3.25rem] flex-col items-center gap-1 rounded-lg px-1.5 pb-1.5 pt-1 transition-colors',
+                isActive
+                  ? 'text-vela-gold'
+                  : 'text-vela-light/45 hover:text-vela-light/85'
               )}
             >
-              <Icon size={24} strokeWidth={isActive ? 1.5 : 1} />
-              <span className="text-[10px] font-medium tracking-wide">{item.label}</span>
+              <span
+                className={cn(
+                  'h-0.5 w-5 rounded-full transition-colors',
+                  isActive ? 'bg-vela-gold/90' : 'bg-transparent'
+                )}
+                aria-hidden
+              />
+              <Icon size={22} strokeWidth={isActive ? 1.35 : 1} className="shrink-0" />
+              <span className={cn('vela-type-micro', isActive ? 'text-vela-gold/90' : '')}>{item.label}</span>
             </Link>
           );
         })}
@@ -91,20 +149,26 @@ function Navigation() {
 
 function Header() {
   return (
-    <header className="sticky top-0 z-40 shrink-0 bg-gradient-to-b from-vela-black/90 to-vela-black/0 backdrop-blur-sm px-6 py-4 flex justify-between items-center">
-      <div className="flex items-center gap-2">
-        <Diamond className="text-vela-gold" size={20} strokeWidth={1.5} />
-        <h1 className="text-xl font-serif tracking-widest uppercase text-vela-light">Vela</h1>
-      </div>
-      <div className="flex gap-5">
-        <Link to="/jewellery-box" className="text-vela-light/80 hover:text-vela-gold transition-colors">
-          <Box size={20} strokeWidth={1.5} />
+    <header className="sticky top-0 z-40 flex shrink-0 items-center justify-between border-b border-vela-gray/20 bg-vela-black/88 px-6 py-3.5 backdrop-blur-md supports-[backdrop-filter]:bg-vela-black/78">
+      <Link to="/" className="group flex min-w-0 items-center gap-2.5">
+        <Diamond className="size-[18px] shrink-0 text-vela-gold" strokeWidth={1.25} aria-hidden />
+        <span className="vela-wordmark transition-colors group-hover:text-vela-gold">
+          Vela
+        </span>
+      </Link>
+      <div className="flex items-center gap-1 sm:gap-2">
+        <Link
+          to="/jewellery-box"
+          className="vela-icon-btn"
+          aria-label="Digital jewellery box"
+        >
+          <Box size={20} strokeWidth={1.35} />
         </Link>
-        <Link to="/sizer" className="text-vela-light/80 hover:text-vela-gold transition-colors">
-          <Ruler size={20} strokeWidth={1.5} />
+        <Link to="/sizer" className="vela-icon-btn" aria-label="Ring sizer">
+          <Ruler size={20} strokeWidth={1.35} />
         </Link>
-        <Link to="/profile" className="text-vela-light/80 hover:text-vela-gold transition-colors">
-          <User size={20} strokeWidth={1.5} />
+        <Link to="/profile" className="vela-icon-btn" aria-label="Profile">
+          <User size={20} strokeWidth={1.35} />
         </Link>
       </div>
     </header>
@@ -117,7 +181,7 @@ export default function App() {
       <SplashScreen />
       <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-vela-black text-vela-light font-sans">
         <Header />
-        <main className="relative flex min-h-0 flex-1 flex-col w-full max-w-md mx-auto overflow-hidden pb-20">
+        <main className="relative mx-auto flex h-full min-h-0 w-full max-w-md flex-1 flex-col overflow-hidden">
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/design/ai" element={<AIDesign />} />
