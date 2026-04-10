@@ -5,7 +5,8 @@ import * as THREE from 'three';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChevronRight } from 'lucide-react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useLoader } from '@react-three/fiber';
+import { FBXLoader } from 'three-stdlib';
 
 class CanvasErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
   state = { hasError: false };
@@ -34,8 +35,8 @@ class CanvasErrorBoundary extends Component<{ children: ReactNode }, { hasError:
 function RingModel({ metal, stone, shape, engraving, bandStyle, settingStyle }: any) {
   const group = useRef<THREE.Group>(null);
   
-
-
+  // Load the external FBX file you placed in the Vela-Concierge folder
+  const fbx = useLoader(FBXLoader, '/eternal-pear-ring-free-3d-jewelry-model.FBX');
   // Define ultra-realistic physical materials
   const metalProps = { 
     metalness: 1, 
@@ -77,9 +78,53 @@ function RingModel({ metal, stone, shape, engraving, bandStyle, settingStyle }: 
     });
   }, [activeStoneProps]);
 
+  // Initialize geometry heavily only ONCE (prevents JS thread freezing)
+  useEffect(() => {
+    if (!fbx.userData.initialized) {
+      fbx.traverse((child: any) => {
+        if (child.isMesh) {
+          // Disable shadow casting for heavy meshes to prevent GPU timeouts
+          child.castShadow = false;
+          child.receiveShadow = false;
+          
+          if (!child.userData.normalsComputed) {
+            child.geometry.computeVertexNormals();
+            child.userData.normalsComputed = true;
+          }
+        }
+      });
 
+      // Center and scale the FBX
+      const box = new THREE.Box3().setFromObject(fbx);
+      const center = box.getCenter(new THREE.Vector3());
+      fbx.position.sub(center);
+      fbx.position.y += 0.8;
+      
+      // FBX sizes can vary drastically. Scale it down to fit.
+      fbx.scale.set(0.015, 0.015, 0.015);
+      fbx.userData.initialized = true;
+    }
+  }, [fbx]);
 
-  useFrame(() => {
+  // Dynamically patch materials
+  useEffect(() => {
+    fbx.traverse((child: any) => {
+      if (child.isMesh) {
+        const matName = child.material?.name?.toLowerCase() || child.name?.toLowerCase() || '';
+        
+        // Intelligent material assignment based on typical FBX part names
+        if (matName.includes("diamond") || matName.includes("gem") || matName.includes("stone")) {
+           child.material = stoneMaterial;
+        } else if (matName.includes("setting") || matName.includes("prong")) {
+           child.material = settingMaterial;
+        } else {
+           // Default to main metal for the band
+           child.material = activeMetal;
+        }
+        child.material.needsUpdate = true;
+      }
+    });
+  }, [fbx, activeMetal, settingMaterial, stoneMaterial]);  useFrame(() => {
     if (group.current) {
       group.current.rotation.y += 0.005; // Elegant rotation
     }
@@ -87,101 +132,10 @@ function RingModel({ metal, stone, shape, engraving, bandStyle, settingStyle }: 
 
   return (
     <Float speed={1.2} rotationIntensity={0.03} floatIntensity={0.06}>
-      <group ref={group} position={[0, -0.25, 0]} rotation={[0.18, 0.2, -0.2]}>
-        {/* Cathedral knife-edge band for a premium solitaire profile */}
-        <group>
-          <mesh material={activeMetal} scale={[1, 1.18, 0.62]}>
-            <torusGeometry args={[1, 0.1, 96, 180]} />
-          </mesh>
-          <mesh material={activeMetal} position={[0, 0.62, 0]} rotation={[0, 0, Math.PI / 2]}>
-            <cylinderGeometry args={[0.075, 0.045, 0.55, 32]} />
-          </mesh>
-          <mesh material={activeMetal} position={[0, 0.62, 0]} rotation={[0, 0, -Math.PI / 2]}>
-            <cylinderGeometry args={[0.075, 0.045, 0.55, 32]} />
-          </mesh>
-        </group>
-
-        {/* Pavé Diamonds - Optimized using InstancedMesh */}
-        {bandStyle === 'pave' && (
-          <Instances range={20} material={paveMaterial} geometry={paveGeometry}>
-            {Array.from({ length: 20 }).map((_, i) => {
-              const angle = (Math.PI / 4) + (i / 19) * (Math.PI / 2); // Top quadrant
-              if (angle > Math.PI/2 - 0.18 && angle < Math.PI/2 + 0.18) return null; // Gap for setting
-              return (
-                <Instance
-                  key={i}
-                  position={[
-                    Math.cos(angle) * 1.08,
-                    Math.sin(angle) * 1.08 * 1.1,
-                    0
-                  ]}
-                  rotation={[0, 0, angle]}
-                />
-              )
-            })}
-          </Instances>
-        )}
-
-
-
-        {/* Setting & Main Stone */}
-        {stone !== 'none' && (
-          <group position={[0, 1.13, 0]}>
-            {/* Base of setting (blends into the band) */}
-            <mesh material={settingMaterial} position={[0, -0.08, 0]}>
-              <cylinderGeometry args={[0.07, 0.11, 0.12, 32]} />
-            </mesh>
-            
-            {settingStyle === 'bezel' ? (
-              // Bezel Setting
-              <mesh material={settingMaterial} position={[0, 0.15, 0]}>
-                <cylinderGeometry args={[0.42, 0.2, 0.25, 64]} />
-              </mesh>
-            ) : (
-              // Realistic 6-Prong Setting (Classic Tiffany style)
-              <group>
-                {/* Gallery Rail (horizontal wire connecting prongs) */}
-                <mesh material={settingMaterial} position={[0, 0.08, 0]} rotation={[Math.PI/2, 0, 0]}>
-                  <torusGeometry args={[0.25, 0.02, 16, 64]} />
-                </mesh>
-                {/* Prongs */}
-                {[0, 1, 2, 3, 4, 5].map((i) => {
-                  const angle = (i / 6) * Math.PI * 2;
-                  return (
-                    <group key={i} rotation={[0, angle, 0]}>
-                      {/* Prong body (angled outwards from base to girdle) */}
-                      <mesh material={settingMaterial} position={[0, 0.12, 0.2]} rotation={[0.55, 0, 0]}>
-                        <cylinderGeometry args={[0.018, 0.026, 0.4, 18]} />
-                      </mesh>
-                      {/* Prong tip (rounded, holding the crown) */}
-                      <mesh material={settingMaterial} position={[0, 0.3, 0.3]} rotation={[0.55, 0, 0]}>
-                        <sphereGeometry args={[0.025, 16, 16]} />
-                      </mesh>
-                    </group>
-                  )
-                })}
-              </group>
-            )}
-            
-            {/* Stone - High-Fidelity Lathe Geometry */}
-            <mesh position={[0, 0.14, 0]} scale={shape === 'oval' ? [1, 1, 1.3] : shape === 'emerald' ? [0.8, 1, 1.2] : [1, 1, 1]}>
-              {shape === 'emerald' ? (
-                <octahedronGeometry args={[0.4, 2]} />
-              ) : (
-                <latheGeometry args={[diamondPoints, shape === 'oval' ? 32 : 16]} />
-              )}
-              <MeshTransmissionMaterial 
-                {...activeStoneProps} 
-                resolution={1024}
-                samples={8}
-                anisotropy={16}
-                clearcoat={1}
-                clearcoatRoughness={0}
-                envMapIntensity={3}
-              />
-            </mesh>
-          </group>
-        )}
+      <group ref={group} position={[0, -0.4, 0]}>
+        
+        {/* Render the hydrated FBX file directly */}
+        <primitive object={fbx} />
 
         {/* Dynamic Engraving overlaid on the geometry's relative coord system */}
         {engraving && (
