@@ -1,4 +1,5 @@
 import { FileText, Bell, Share } from 'lucide-react';
+import { PageShell } from '@/components/shell/PageShell';
 
 export default function JewelleryBox() {
   const pieces = [
@@ -23,59 +24,63 @@ export default function JewelleryBox() {
   ];
 
   return (
-    <div className="h-full min-h-0 space-y-8 overflow-y-auto p-6 pb-24 animate-in fade-in duration-500">
-      <div className="flex justify-between items-end">
-        <div className="space-y-2">
-          <h2 className="text-2xl font-serif text-vela-gold">Digital Jewellery Box</h2>
-          <p className="text-sm text-vela-light/70 font-light">
-            Your personal vault of Vela pieces.
-          </p>
-        </div>
-        <button className="text-vela-gold hover:text-vela-gold-muted p-2">
-          <Share size={20} />
+    <PageShell
+      kicker="Collection"
+      title="Digital Jewellery Box"
+      subtitle="Certificates, care, and the story of each Vela piece—yours alone."
+      right={
+        <button type="button" className="vela-icon-btn text-vela-gold hover:text-vela-gold-muted" aria-label="Share collection">
+          <Share size={20} strokeWidth={1.25} />
         </button>
-      </div>
-
+      }
+      className="animate-in fade-in duration-500"
+    >
       <div className="grid gap-6">
-        {pieces.map(piece => (
-          <div key={piece.id} className="bg-vela-dark border border-vela-gray/30 rounded-xl overflow-hidden group">
-            <div className="aspect-video relative overflow-hidden">
-              <img 
-                src={piece.image} 
-                alt={piece.name} 
-                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+        {pieces.map((piece) => (
+          <div key={piece.id} className="vela-card-surface overflow-hidden group">
+            <div className="relative aspect-video overflow-hidden">
+              <img
+                src={piece.image}
+                alt={piece.name}
+                className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-vela-black/80 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-vela-black/85 to-transparent" />
               <div className="absolute bottom-4 left-4 right-4">
-                <h3 className="font-serif text-xl">{piece.name}</h3>
-                <p className="text-xs text-vela-gold font-mono">{piece.type}</p>
+                <h3 className="vela-type-card-hero">{piece.name}</h3>
+                <p className="vela-kicker-text mt-1">{piece.type}</p>
               </div>
             </div>
-            
-            <div className="p-4 grid grid-cols-2 gap-4 text-sm">
+
+            <div className="grid grid-cols-2 gap-4 p-4">
               <div>
-                <p className="text-vela-light/50 text-xs mb-1">Metal</p>
-                <p>{piece.metal}</p>
+                <p className="vela-field-label">Metal</p>
+                <p className="vela-type-body text-vela-light/90">{piece.metal}</p>
               </div>
               <div>
-                <p className="text-vela-light/50 text-xs mb-1">Acquired</p>
-                <p>{piece.date}</p>
+                <p className="vela-field-label">Acquired</p>
+                <p className="vela-type-body text-vela-light/90">{piece.date}</p>
               </div>
             </div>
-            
-            <div className="border-t border-vela-gray/30 p-4 flex gap-2">
+
+            <div className="flex gap-2 border-t border-vela-gray/20 p-4">
               {piece.hasCert && (
-                <button className="flex-1 flex items-center justify-center gap-2 bg-vela-black border border-vela-gray/50 py-2 rounded-lg text-xs hover:border-vela-gold/50 transition-colors">
-                  <FileText size={14} /> Certificate
+                <button
+                  type="button"
+                  className="vela-type-caption flex flex-1 items-center justify-center gap-2 rounded-lg border border-vela-gray/35 bg-vela-black py-2.5 text-vela-light/85 transition-colors hover:border-vela-gold/45"
+                >
+                  <FileText size={14} strokeWidth={1.25} /> Certificate
                 </button>
               )}
-              <button className="flex-1 flex items-center justify-center gap-2 bg-vela-black border border-vela-gray/50 py-2 rounded-lg text-xs hover:border-vela-gold/50 transition-colors">
-                <Bell size={14} /> Care Reminder
+              <button
+                type="button"
+                className="vela-type-caption flex flex-1 items-center justify-center gap-2 rounded-lg border border-vela-gray/35 bg-vela-black py-2.5 text-vela-light/85 transition-colors hover:border-vela-gold/45"
+              >
+                <Bell size={14} strokeWidth={1.25} /> Care Reminder
               </button>
             </div>
           </div>
         ))}
       </div>
-    </div>
+    </PageShell>
   );
 }

@@ -1,10 +1,11 @@
 import { useState, Suspense, useRef, useMemo, Component, type ReactNode, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber';
 import { OrbitControls, Environment, Text, Float, ContactShadows, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
-import { Check, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { FBXLoader } from 'three-stdlib';
 
 class CanvasErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
@@ -18,9 +19,9 @@ class CanvasErrorBoundary extends Component<{ children: ReactNode }, { hasError:
     if (this.state.hasError) {
       return (
         <div className="absolute inset-0 flex items-center justify-center px-6 text-center">
-          <div className="lux-surface rounded-[var(--lux-radius-md)] border border-[var(--lux-border)] px-4 py-3 shadow-[var(--lux-shadow-soft)]">
-            <p className="lux-ui lux-muted text-[10px] tracking-[0.22em] uppercase">3D preview unavailable</p>
-            <p className="lux-ui lux-text mt-2 text-sm">Refresh to retry rendering the ring preview.</p>
+          <div className="lux-surface max-w-xs rounded-[var(--lux-radius-md)] border border-[var(--lux-border)] px-5 py-4 shadow-[var(--lux-shadow-soft)]">
+            <p className="lux-kicker">Preview unavailable</p>
+            <p className="lux-ui mt-3 text-sm leading-relaxed text-[#121212]">Refresh the page to reload the ring model.</p>
           </div>
         </div>
       );
@@ -49,8 +50,8 @@ const tabs: Array<{ id: 'metal' | 'band' | 'setting' | 'stone' | 'engrave'; labe
 function Loading3D() {
   return (
     <Html center>
-      <div className="lux-surface rounded-[var(--lux-radius-sm)] border border-[var(--lux-border)] px-4 py-2 shadow-[var(--lux-shadow-soft)]">
-        <span className="lux-ui lux-muted text-[10px] uppercase tracking-[0.2em]">Loading model</span>
+      <div className="lux-surface rounded-[var(--lux-radius-sm)] border border-[var(--lux-border)] px-4 py-2.5 shadow-[var(--lux-shadow-soft)]">
+        <span className="lux-kicker !text-[#707070]">Loading model</span>
       </div>
     </Html>
   );
@@ -58,20 +59,49 @@ function Loading3D() {
 
 const LOOK_AT = new THREE.Vector3(0, 0, 0);
 
-function CameraRig({ view }: { view: 'hero' | 'top' | 'profile' }) {
-  const { camera } = useThree();
-  const targets: Record<'hero' | 'top' | 'profile', [number, number, number]> = {
-    /* Hero: centered on X, slight elevation for a natural product shot */
-    hero: [0, 0.22, 1.42],
-    top: [0, 2.05, 0.92],
-    profile: [1.95, 0.18, 0.12]
-  };
+const VIEW_TARGETS: Record<'hero' | 'top' | 'profile', [number, number, number]> = {
+  hero: [0, 0.22, 1.42],
+  top: [0, 2.05, 0.92],
+  profile: [1.95, 0.18, 0.12],
+};
 
-  useFrame((_, delta) => {
-    const [x, y, z] = targets[view];
-    const t = Math.min(1, delta * 4.2);
-    camera.position.lerp(new THREE.Vector3(x, y, z), t);
+type OrbitControlsLike = {
+  enabled: boolean;
+  target: THREE.Vector3;
+  update: () => void;
+};
+
+/** Lerp camera only when a view preset is chosen so OrbitControls can orbit freely between presets. */
+function CameraRig({ view }: { view: 'hero' | 'top' | 'profile' }) {
+  const camera = useThree((s) => s.camera);
+
+  const goal = useRef(new THREE.Vector3(...VIEW_TARGETS.hero));
+  const transitioning = useRef(false);
+
+  useEffect(() => {
+    const [x, y, z] = VIEW_TARGETS[view];
+    goal.current.set(x, y, z);
+    transitioning.current = true;
+  }, [view]);
+
+  useFrame((state, delta) => {
+    if (!transitioning.current) return;
+    const controls = state.controls as unknown as OrbitControlsLike | undefined;
+    if (controls) controls.enabled = false;
+
+    const t = 1 - (1 - Math.min(1, delta * 4.8)) ** 2;
+    camera.position.lerp(goal.current, t);
     camera.lookAt(LOOK_AT);
+    if (camera.position.distanceTo(goal.current) < 0.04) {
+      camera.position.copy(goal.current);
+      camera.lookAt(LOOK_AT);
+      transitioning.current = false;
+      if (controls) {
+        controls.target.copy(LOOK_AT);
+        controls.update();
+        controls.enabled = true;
+      }
+    }
   });
 
   return null;
@@ -81,35 +111,72 @@ function RingModel({ metal, stone, shape, engraving, bandStyle, settingStyle }: 
   const group = useRef<THREE.Group>(null);
   const fbx = useLoader(FBXLoader, '/eternal-pear-ring-free-3d-jewelry-model.FBX');
 
-  const metalProps = {
-    metalness: 1,
-    roughness: 0.05,
-    clearcoat: 1,
-    clearcoatRoughness: 0.1,
-    envMapIntensity: 2.5
-  };
-
+  // Per-metal PBR — each value tuned to real-world material behaviour
   const materials = useMemo(() => ({
-    'yellow gold': new THREE.MeshPhysicalMaterial({ color: '#E5C07B', ...metalProps }),
-    'rose gold': new THREE.MeshPhysicalMaterial({ color: '#DDA7A5', ...metalProps }),
-    'white gold': new THREE.MeshPhysicalMaterial({ color: '#F8F9FA', ...metalProps, roughness: 0.03 }),
-    'platinum': new THREE.MeshPhysicalMaterial({ color: '#E5E4E2', ...metalProps, roughness: 0.01, envMapIntensity: 3 })
+    // 18k yellow gold: warm, slightly soft, brushed-satin clearcoat
+    'yellow gold': new THREE.MeshPhysicalMaterial({
+      color: '#C9A84C', metalness: 1, roughness: 0.12,
+      clearcoat: 0.6, clearcoatRoughness: 0.08,
+      anisotropy: 0.6, anisotropyRotation: 0.25,
+      envMapIntensity: 2.8,
+    }),
+    // 18k rose gold: copper-warm, slightly more diffuse
+    'rose gold': new THREE.MeshPhysicalMaterial({
+      color: '#C07050', metalness: 1, roughness: 0.18,
+      clearcoat: 0.4, clearcoatRoughness: 0.12,
+      anisotropy: 0.4,
+      iridescence: 0.08, iridescenceIOR: 1.5,
+      envMapIntensity: 2.4,
+    }),
+    // 18k white gold: near-neutral, high specular
+    'white gold': new THREE.MeshPhysicalMaterial({
+      color: '#C8C8C4', metalness: 1, roughness: 0.06,
+      clearcoat: 1, clearcoatRoughness: 0.04,
+      anisotropy: 0.3,
+      envMapIntensity: 3,
+    }),
+    // Platinum: coldest white, near-mirror polish, high clearcoat
+    'platinum': new THREE.MeshPhysicalMaterial({
+      color: '#E2E1DE', metalness: 1, roughness: 0.03,
+      clearcoat: 1, clearcoatRoughness: 0.01,
+      anisotropy: 0.2,
+      envMapIntensity: 3.5,
+    }),
   }), []);
 
   const settingMaterial = metal === 'yellow gold' || metal === 'rose gold' ? materials['white gold'] : materials[metal];
   const activeMetal = materials[metal];
+
+  // Gemstone props — physically accurate IOR + dispersion + iridescence for fire
   const stoneProps = useMemo(() => ({
-    diamond: { color: '#ffffff', transmission: 1, ior: 2.417, thickness: 1.5, roughness: 0, dispersion: 1.5 },
-    emerald: { color: '#50C878', transmission: 1, ior: 1.577, thickness: 1.5, roughness: 0, dispersion: 0.8 },
-    sapphire: { color: '#0F52BA', transmission: 1, ior: 1.762, thickness: 1.5, roughness: 0, dispersion: 0.5 },
-    ruby: { color: '#E0115F', transmission: 1, ior: 1.762, thickness: 1.5, roughness: 0, dispersion: 0.5 }
+    diamond: {
+      color: '#ffffff', transmission: 1, ior: 2.417, thickness: 1.8,
+      roughness: 0, dispersion: 1.8,
+      iridescence: 0.35, iridescenceIOR: 2.4,
+      iridescenceThicknessRange: [100, 400] as [number, number],
+    },
+    emerald: {
+      color: '#3CB371', transmission: 0.92, ior: 1.577, thickness: 2,
+      roughness: 0.02, dispersion: 0.8,
+      attenuationColor: new THREE.Color('#1a6b3c'), attenuationDistance: 0.6,
+    },
+    sapphire: {
+      color: '#1240AB', transmission: 0.9, ior: 1.762, thickness: 2,
+      roughness: 0.01, dispersion: 0.5,
+      attenuationColor: new THREE.Color('#0a1f6b'), attenuationDistance: 0.7,
+    },
+    ruby: {
+      color: '#C10230', transmission: 0.88, ior: 1.762, thickness: 2,
+      roughness: 0.01, dispersion: 0.5,
+      attenuationColor: new THREE.Color('#6b0010'), attenuationDistance: 0.7,
+    },
   }), []);
 
   const stoneMaterials = useMemo(() => ({
-    diamond: new THREE.MeshPhysicalMaterial({ ...stoneProps.diamond, envMapIntensity: 4, transparent: true, side: THREE.DoubleSide }),
-    emerald: new THREE.MeshPhysicalMaterial({ ...stoneProps.emerald, envMapIntensity: 4, transparent: true, side: THREE.DoubleSide }),
-    sapphire: new THREE.MeshPhysicalMaterial({ ...stoneProps.sapphire, envMapIntensity: 4, transparent: true, side: THREE.DoubleSide }),
-    ruby: new THREE.MeshPhysicalMaterial({ ...stoneProps.ruby, envMapIntensity: 4, transparent: true, side: THREE.DoubleSide })
+    diamond: new THREE.MeshPhysicalMaterial({ ...stoneProps.diamond, envMapIntensity: 5, transparent: true, side: THREE.DoubleSide }),
+    emerald: new THREE.MeshPhysicalMaterial({ ...stoneProps.emerald, envMapIntensity: 4.5, transparent: true, side: THREE.DoubleSide }),
+    sapphire: new THREE.MeshPhysicalMaterial({ ...stoneProps.sapphire, envMapIntensity: 4.5, transparent: true, side: THREE.DoubleSide }),
+    ruby:    new THREE.MeshPhysicalMaterial({ ...stoneProps.ruby,    envMapIntensity: 4.5, transparent: true, side: THREE.DoubleSide }),
   }), [stoneProps]);
 
   useEffect(() => {
@@ -225,242 +292,360 @@ export default function Configurator3D() {
     }, 450);
   };
 
-  const tabBase =
-    'h-7 shrink-0 whitespace-nowrap rounded-[var(--lux-pill)] border px-2.5 lux-ui text-[8px] tracking-[0.14em] uppercase transition-colors';
+  const stepIndex = tabs.findIndex((t) => t.id === activeTab);
+
+  const handleNext = () => {
+    if (stepIndex < tabs.length - 1) {
+      setActiveTab(tabs[stepIndex + 1].id);
+    } else {
+      saveToBrief();
+    }
+  };
+
+  const handleBack = () => {
+    if (stepIndex > 0) setActiveTab(tabs[stepIndex - 1].id);
+  };
+
+  const stepTitle =
+    activeTab === 'metal'
+      ? 'Select your metal'
+      : activeTab === 'band'
+        ? 'Band style'
+        : activeTab === 'setting'
+          ? 'Setting style'
+          : activeTab === 'stone'
+            ? 'Center stone & cut'
+            : 'Engraving';
+
+  const viewPresets = [
+    { id: 'hero' as const, label: 'Studio' },
+    { id: 'top' as const, label: 'From above' },
+    { id: 'profile' as const, label: 'Profile' },
+  ];
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden lux-bg lux-text">
-      <section className="shrink-0 px-4 pb-0.5 pt-1">
-        <p className="lux-ui lux-muted text-[8px] uppercase tracking-[0.18em]">Vela bespoke studio</p>
-        <h1 className="lux-display mt-0.5 text-lg leading-none tracking-tight">Ring 3D Studio</h1>
-        <p className="lux-ui lux-muted mt-0.5 truncate text-[8px] uppercase tracking-[0.16em]">
-          Solitaire customization
-        </p>
-      </section>
+      {/* ── Studio header: hierarchy + estimate ── */}
+      <header className="shrink-0 border-b border-[var(--lux-border)] px-5 pb-5 pt-[max(0.5rem,env(safe-area-inset-top))]">
+        <Link
+          to="/"
+          className="lux-ui mb-4 inline-flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-[#707070] transition-colors hover:text-[#121212]"
+        >
+          <ChevronLeft size={16} strokeWidth={1.5} aria-hidden />
+          Atelier
+        </Link>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <section className="relative min-h-0 flex-[2.05] basis-0 border-y border-[var(--lux-border)] bg-[radial-gradient(circle_at_50%_50%,#ffffff_0%,#f4f4f4_52%,#e8e8e8_100%)]">
-          <CanvasErrorBoundary>
-            <Canvas
-              className="h-full w-full touch-none"
-              camera={{ position: [0, 0.22, 1.42], fov: 50 }}
-              dpr={typeof window !== 'undefined' ? Math.min(window.devicePixelRatio, 2) : 1.5}
-              gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.28, powerPreference: 'high-performance' }}
-            >
-              <CameraRig view={view} />
-              <ambientLight intensity={1.1} />
-              <spotLight position={[8, 12, 10]} angle={0.32} penumbra={1} intensity={3.1} castShadow={false} />
-              <spotLight position={[-7, 9, -9]} angle={0.35} penumbra={1} intensity={1.5} />
-              <pointLight position={[0, 4, 1]} intensity={1.2} />
-              <Suspense fallback={<Loading3D />}>
-                <RingModel {...config} />
-                <Environment preset="city" />
-                <ContactShadows position={[0, -1.15, 0]} opacity={0.2} scale={6} blur={2.4} far={3.5} color="#8f8f8f" />
-              </Suspense>
-              <OrbitControls
-                target={[0, 0, 0]}
-                enablePan={false}
-                minPolarAngle={Math.PI / 5.5}
-                maxPolarAngle={Math.PI / 1.48}
-                minDistance={1.02}
-                maxDistance={3.15}
-              />
-            </Canvas>
-          </CanvasErrorBoundary>
-
+        <div className="flex items-start justify-between gap-6">
+          <div className="min-w-0 flex-1">
+            <p className="lux-kicker">Vela bespoke studio</p>
+            <h1 className="lux-page-title mt-1">Ring 3D Studio</h1>
+            <p className="lux-ui mt-2 max-w-[17rem] text-xs font-normal leading-relaxed tracking-[0.02em] text-[#707070]">
+              Solitaire customization — drag to rotate, pinch to zoom.
+            </p>
+          </div>
           <motion.div
             key={estimatedPrice}
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.2 }}
-            className="absolute right-2 top-2 z-10 flex h-7 items-center rounded-[var(--lux-pill)] border border-[#e5cc8b] lux-surface px-2 shadow-[var(--lux-shadow-soft)]"
+            initial={{ opacity: 0.5 }}
+            animate={{ opacity: 1 }}
+            className="shrink-0 text-right"
           >
-            <span className="lux-display text-xs leading-none lux-accent">${estimatedPrice.toLocaleString()}</span>
+            <p className="lux-ui text-[9px] font-medium uppercase tracking-[0.2em] text-[#707070]">Estimate</p>
+            <p className="lux-display mt-1 text-xl font-normal tabular-nums tracking-tight text-[#121212]">
+              ${estimatedPrice.toLocaleString()}
+            </p>
           </motion.div>
-        </section>
+        </div>
 
-        <section className="flex min-h-0 flex-[0.62] basis-0 flex-col overflow-hidden px-4 pb-1 pt-1">
-          <div className="flex shrink-0 justify-center pb-1">
-            <div className="flex gap-0.5 rounded-[var(--lux-pill)] border border-[var(--lux-border)] lux-surface p-0.5">
-              {(['hero', 'top', 'profile'] as const).map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => setView(v)}
-                  className={cn(
-                    'h-6 rounded-[var(--lux-pill)] px-3 lux-ui text-[8px] uppercase tracking-[0.14em] transition-colors',
-                    view === v ? 'bg-[#121212] text-[#f1f1f1]' : 'text-[#121212] hover:bg-[#f1f1f1]'
-                  )}
-                >
-                  {v}
-                </button>
-              ))}
-            </div>
+        {/* Step progress + jump navigation */}
+        <div className="mt-6 space-y-3">
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="lux-ui text-[10px] font-medium uppercase tracking-[0.2em] text-[#707070]">
+              Step {stepIndex + 1} of {tabs.length}
+            </p>
+            <p className="lux-display text-sm font-normal text-[#121212]">{tabs[stepIndex].label}</p>
           </div>
-
-          <div className="no-scrollbar flex shrink-0 gap-1.5 overflow-x-auto pb-1">
+          <div className="h-1 w-full overflow-hidden rounded-full bg-[#e4e4e4]">
+            <div
+              className="h-full rounded-full bg-[#121212] transition-[width] duration-300 ease-out"
+              style={{ width: `${((stepIndex + 1) / tabs.length) * 100}%` }}
+              role="progressbar"
+              aria-valuenow={stepIndex + 1}
+              aria-valuemin={1}
+              aria-valuemax={tabs.length}
+            />
+          </div>
+          <nav className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 py-0.5" aria-label="Customization steps">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  tabBase,
+                  'lux-ui min-h-10 shrink-0 rounded-full border px-4 text-[9px] font-medium uppercase tracking-[0.16em] transition-colors',
                   activeTab === tab.id
-                    ? 'border-[#121212] bg-[#121212] text-[#f1f1f1]'
-                    : 'border-[var(--lux-border)] bg-transparent text-[#121212] hover:border-[#121212]'
+                    ? 'border-[#121212] bg-[#121212] text-[#f5f5f5]'
+                    : 'border-[var(--lux-border)] bg-white text-[#121212] hover:border-[#b0b0b0]',
                 )}
               >
                 {tab.label}
               </button>
             ))}
+          </nav>
+        </div>
+      </header>
+
+      {/* ── 3D viewport ── */}
+      <section className="relative min-h-[min(52vh,22rem)] flex-1 basis-0 bg-[radial-gradient(circle_at_50%_42%,#ffffff_0%,#f4f4f4_48%,#e6e6e6_100%)]">
+        <CanvasErrorBoundary>
+          <Canvas
+            className="h-full w-full min-h-[240px] touch-none"
+            camera={{ position: VIEW_TARGETS.hero, fov: 48 }}
+            dpr={typeof window !== 'undefined' ? Math.min(window.devicePixelRatio, 2) : 1.5}
+            gl={{
+              antialias: true,
+              toneMapping: THREE.ACESFilmicToneMapping,
+              toneMappingExposure: 1.35,
+              powerPreference: 'high-performance',
+            }}
+          >
+            <CameraRig view={view} />
+            <ambientLight intensity={1.05} />
+            <spotLight position={[8, 12, 10]} angle={0.32} penumbra={1} intensity={3} castShadow={false} />
+            <spotLight position={[-7, 9, -9]} angle={0.35} penumbra={1} intensity={1.45} />
+            <pointLight position={[0, 4, 1]} intensity={1.15} />
+            <Suspense fallback={<Loading3D />}>
+              <RingModel {...config} />
+              <Environment preset="studio" />
+              <ContactShadows position={[0, -1.15, 0]} opacity={0.18} scale={6} blur={2.6} far={3.5} color="#8f8f8f" />
+            </Suspense>
+            <OrbitControls
+              makeDefault
+              enableDamping
+              dampingFactor={0.08}
+              target={[0, 0, 0]}
+              enablePan={false}
+              minPolarAngle={Math.PI / 5.5}
+              maxPolarAngle={Math.PI / 1.48}
+              minDistance={1.02}
+              maxDistance={3.15}
+            />
+          </Canvas>
+        </CanvasErrorBoundary>
+
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#f0f0f0]/90 to-transparent" aria-hidden />
+
+        <div className="absolute bottom-4 left-1/2 z-10 w-[min(calc(100%-2rem),20rem)] -translate-x-1/2 px-2">
+          <p className="lux-ui mb-2 text-center text-[9px] font-medium uppercase tracking-[0.2em] text-[#707070]">
+            View
+          </p>
+          <div
+            className="flex gap-1 rounded-full border border-[rgba(0,0,0,0.1)] bg-white/90 p-1 shadow-[var(--lux-shadow-soft)] backdrop-blur-md"
+            role="group"
+            aria-label="Camera angle"
+          >
+            {viewPresets.map((v) => (
+              <button
+                key={v.id}
+                type="button"
+                onClick={() => setView(v.id)}
+                className={cn(
+                  'lux-ui min-h-10 flex-1 rounded-full px-2 text-[9px] font-medium uppercase tracking-[0.12em] transition-colors',
+                  view === v.id ? 'bg-[#121212] text-white' : 'text-[#121212] hover:bg-[#f0f0f0]',
+                )}
+              >
+                {v.label}
+              </button>
+            ))}
           </div>
+        </div>
+      </section>
 
-          <div className="lux-surface no-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-[var(--lux-radius-md)] border border-[var(--lux-border)] px-2 py-2">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.18 }}
-              className="space-y-2"
-            >
-              {activeTab === 'metal' && (
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {[
-                    { id: 'yellow gold', label: 'Yellow Gold', color: 'bg-gradient-to-br from-[#F3E5AB] to-[#D4AF37]' },
-                    { id: 'white gold', label: 'White Gold', color: 'bg-gradient-to-br from-[#F8F9FA] to-[#DCDCDC]' },
-                    { id: 'rose gold', label: 'Rose Gold', color: 'bg-gradient-to-br from-[#E8B3B9] to-[#B76E79]' },
-                    { id: 'platinum', label: 'Platinum', color: 'bg-gradient-to-br from-[#E5E4E2] to-[#9FA0A4]' }
-                  ].map((m) => (
-                    <button key={m.id} onClick={() => setConfig({ ...config, metal: m.id as RingConfig['metal'] })} className="space-y-1">
-                      <div
-                        className={cn(
-                          'mx-auto flex h-10 w-10 items-center justify-center rounded-full border transition-colors',
-                          m.color,
-                          config.metal === m.id ? 'border-[#121212]' : 'border-[#e4e4e4]'
-                        )}
-                      >
-                        {config.metal === m.id ? <Check size={12} className="text-[#121212]" /> : null}
-                      </div>
-                      <p className="lux-ui text-center text-[7px] uppercase tracking-[0.12em]">{m.label}</p>
-                    </button>
-                  ))}
-                </div>
-              )}
+      {/* ── Options sheet ── */}
+      <div className="shrink-0 border-t border-[var(--lux-border)] bg-[var(--lux-bg)] px-5 pb-[calc(5.75rem+env(safe-area-inset-bottom,0px))] pt-6">
+        <div className="mb-5">
+          <p className="lux-kicker">Current step</p>
+          <h2 className="lux-display mt-1 text-lg font-normal text-[#121212]">{stepTitle}</h2>
+        </div>
 
-              {activeTab === 'band' && (
-                <div className="grid grid-cols-2 gap-2">
-                  {(['plain', 'pave'] as const).map((item) => (
-                    <button
-                      key={item}
-                      onClick={() => setConfig({ ...config, bandStyle: item })}
-                      className={cn(
-                        'flex h-9 items-center justify-between rounded-[var(--lux-radius-sm)] border px-2.5 transition-colors',
-                        config.bandStyle === item ? 'border-[#121212] bg-[#f8f6f1]' : 'border-[var(--lux-border)]'
-                      )}
-                    >
-                      <span className="lux-ui text-[9px] uppercase tracking-[0.14em]">{item}</span>
-                      <span className="lux-ui text-[8px] lux-muted">{item === 'pave' ? '+$400' : 'Inc.'}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            className="mb-6"
+          >
+            {activeTab === 'metal' && (
+              <div className="no-scrollbar flex flex-wrap gap-3">
+                {[
+                  { id: 'yellow gold', label: 'Yellow gold' },
+                  { id: 'white gold', label: 'White gold' },
+                  { id: 'rose gold', label: 'Rose gold' },
+                  { id: 'platinum', label: 'Platinum' },
+                ].map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setConfig({ ...config, metal: m.id as RingConfig['metal'] })}
+                    className={cn(
+                      'lux-chip',
+                      config.metal === m.id ? 'lux-chip-active' : 'lux-chip-inactive',
+                    )}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            )}
 
-              {activeTab === 'setting' && (
-                <div className="grid grid-cols-2 gap-2">
-                  {(['solitaire', 'bezel'] as const).map((item) => (
-                    <button
-                      key={item}
-                      onClick={() => setConfig({ ...config, settingStyle: item })}
-                      className={cn(
-                        'flex h-9 items-center justify-between rounded-[var(--lux-radius-sm)] border px-2.5 transition-colors',
-                        config.settingStyle === item ? 'border-[#121212] bg-[#f8f6f1]' : 'border-[var(--lux-border)]'
-                      )}
-                    >
-                      <span className="lux-ui text-[9px] uppercase tracking-[0.14em]">{item}</span>
-                      <span className="lux-ui text-[8px] lux-muted">{item === 'bezel' ? '+$150' : 'Inc.'}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
+            {activeTab === 'band' && (
+              <div className="no-scrollbar flex flex-wrap gap-3">
+                {[
+                  { id: 'plain', label: 'Plain', note: 'Included' },
+                  { id: 'pave', label: 'Pavé', note: '+$400' },
+                ].map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setConfig({ ...config, bandStyle: m.id as RingConfig['bandStyle'] })}
+                    className={cn(
+                      'lux-chip gap-2',
+                      config.bandStyle === m.id ? 'lux-chip-active' : 'lux-chip-inactive',
+                    )}
+                  >
+                    <span>{m.label}</span>
+                    <span className="text-[9px] font-normal opacity-60">{m.note}</span>
+                  </button>
+                ))}
+              </div>
+            )}
 
-              {activeTab === 'stone' && (
-                <>
-                  <p className="lux-ui text-[8px] uppercase tracking-[0.16em] lux-muted">Center stone</p>
-                  <div className="grid grid-cols-2 gap-2">
+            {activeTab === 'setting' && (
+              <div className="no-scrollbar flex flex-wrap gap-3">
+                {[
+                  { id: 'solitaire', label: 'Solitaire', note: 'Included' },
+                  { id: 'bezel', label: 'Bezel', note: '+$150' },
+                ].map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setConfig({ ...config, settingStyle: m.id as RingConfig['settingStyle'] })}
+                    className={cn(
+                      'lux-chip gap-2',
+                      config.settingStyle === m.id ? 'lux-chip-active' : 'lux-chip-inactive',
+                    )}
+                  >
+                    <span>{m.label}</span>
+                    <span className="text-[9px] font-normal opacity-60">{m.note}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {activeTab === 'stone' && (
+              <div className="space-y-5">
+                <div>
+                  <p className="lux-kicker mb-3">Gemstone</p>
+                  <div className="no-scrollbar flex flex-wrap gap-3">
                     {[
                       { id: 'diamond', label: 'Diamond', color: 'bg-gradient-to-br from-white to-gray-200' },
                       { id: 'emerald', label: 'Emerald', color: 'bg-gradient-to-br from-[#50C878] to-[#043927]' },
                       { id: 'sapphire', label: 'Sapphire', color: 'bg-gradient-to-br from-[#0F52BA] to-[#000080]' },
-                      { id: 'ruby', label: 'Ruby', color: 'bg-gradient-to-br from-[#E0115F] to-[#8B0000]' }
+                      { id: 'ruby', label: 'Ruby', color: 'bg-gradient-to-br from-[#E0115F] to-[#8B0000]' },
                     ].map((s) => (
                       <button
                         key={s.id}
+                        type="button"
                         onClick={() => setConfig({ ...config, stone: s.id as RingConfig['stone'] })}
                         className={cn(
-                          'flex h-9 items-center gap-2 rounded-[var(--lux-radius-sm)] border px-2 transition-colors',
-                          config.stone === s.id ? 'border-[#121212] bg-[#f8f6f1]' : 'border-[var(--lux-border)]'
+                          'lux-chip gap-2.5',
+                          config.stone === s.id ? 'lux-chip-active' : 'lux-chip-inactive',
                         )}
                       >
-                        <span className={cn('h-5 w-5 shrink-0 rounded-full border border-[#dfdfdf]', s.color)} />
-                        <span className="lux-ui text-[9px] uppercase tracking-[0.12em]">{s.label}</span>
+                        <span className={cn('h-4 w-4 shrink-0 rounded-full ring-1 ring-black/10', s.color)} />
+                        {s.label}
                       </button>
                     ))}
                   </div>
-                  <div className="pt-1">
-                    <p className="lux-ui mb-1 text-[8px] uppercase tracking-[0.16em] lux-muted">Stone shape</p>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {(['round', 'emerald', 'oval'] as const).map((shape) => (
-                        <button
-                          key={shape}
-                          onClick={() => setConfig({ ...config, shape })}
-                          className={cn(
-                            'h-7 rounded-[var(--lux-pill)] border lux-ui text-[8px] uppercase tracking-[0.12em]',
-                            config.shape === shape ? 'border-[#121212] bg-[#121212] text-[#f1f1f1]' : 'border-[var(--lux-border)]'
-                          )}
-                        >
-                          {shape}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {activeTab === 'engrave' && (
-                <div className="space-y-1.5">
-                  <p className="lux-ui text-[8px] uppercase tracking-[0.14em] lux-muted">Engraving (max 20)</p>
-                  <input
-                    type="text"
-                    maxLength={20}
-                    value={config.engraving}
-                    onChange={(e) => setConfig({ ...config, engraving: e.target.value })}
-                    placeholder="Forever Yours"
-                    className="h-9 w-full rounded-[var(--lux-radius-sm)] border border-[var(--lux-border)] px-2 lux-ui text-xs bg-transparent focus:outline-none focus:border-[#121212]"
-                  />
                 </div>
-              )}
-            </motion.div>
-          </AnimatePresence>
-          </div>
+                <div>
+                  <p className="lux-kicker mb-3">Cut</p>
+                  <div className="no-scrollbar flex flex-wrap gap-3">
+                    {(['round', 'emerald', 'oval'] as const).map((shape) => (
+                      <button
+                        key={shape}
+                        type="button"
+                        onClick={() => setConfig({ ...config, shape })}
+                        className={cn(
+                          'lux-chip capitalize',
+                          config.shape === shape ? 'lux-chip-active' : 'lux-chip-inactive',
+                        )}
+                      >
+                        {shape}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
 
-          <div className="mt-1 shrink-0 space-y-1">
+            {activeTab === 'engrave' && (
+              <div>
+                <label htmlFor="engrave-input" className="sr-only">
+                  Engraving text
+                </label>
+                <input
+                  id="engrave-input"
+                  type="text"
+                  maxLength={20}
+                  value={config.engraving}
+                  onChange={(e) => setConfig({ ...config, engraving: e.target.value })}
+                  placeholder="Forever yours"
+                  className="h-12 w-full rounded-2xl border border-[var(--lux-border)] bg-white px-4 lux-ui text-sm tracking-[0.02em] text-[#121212] placeholder:text-[#a8a8a8] focus:border-[#121212] focus:outline-none focus:ring-2 focus:ring-[#121212]/15 transition-colors"
+                />
+                <p className="lux-ui mt-2 text-right text-[10px] tabular-nums text-[#707070]">
+                  {config.engraving.length} / 20
+                </p>
+              </div>
+            )}
+          </motion.div>
+        </AnimatePresence>
+
+        <div className="flex gap-3">
+          {stepIndex > 0 ? (
             <button
               type="button"
-              onClick={saveToBrief}
-              disabled={isSaving}
-              className="flex h-8 w-full items-center justify-center gap-1.5 rounded-[var(--lux-pill)] bg-[#121212] text-[#f1f1f1] lux-ui text-[8px] uppercase tracking-[0.18em] transition-opacity disabled:opacity-60"
+              onClick={handleBack}
+              className="lux-ui flex min-h-12 min-w-[5.5rem] shrink-0 items-center justify-center rounded-full border border-[var(--lux-border)] bg-white text-[10px] font-medium uppercase tracking-[0.18em] text-[#121212] transition-colors hover:border-[#121212]"
             >
-              {isSaving ? 'Saving...' : 'Save to Brief'}
-              <ChevronRight size={14} />
+              Back
             </button>
-            {saveMessage ? (
-              <p className="lux-ui text-center text-[8px] uppercase tracking-[0.16em] lux-accent">{saveMessage}</p>
-            ) : null}
-          </div>
-        </section>
+          ) : null}
+          <button
+            type="button"
+            onClick={handleNext}
+            disabled={isSaving}
+            className={cn(
+              'flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#121212] text-[#f5f5f5] lux-ui text-[10px] font-medium uppercase tracking-[0.2em] transition-opacity disabled:opacity-55',
+              stepIndex > 0 ? 'min-w-0 flex-1' : 'w-full',
+            )}
+          >
+            {isSaving ? (
+              'Saving…'
+            ) : stepIndex < tabs.length - 1 ? (
+              <>
+                <span>Continue</span>
+                <ChevronRight size={16} strokeWidth={1.5} aria-hidden />
+              </>
+            ) : (
+              <>
+                <span>{saveMessage || 'Save to brief'}</span>
+                <ChevronRight size={16} strokeWidth={1.5} aria-hidden />
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

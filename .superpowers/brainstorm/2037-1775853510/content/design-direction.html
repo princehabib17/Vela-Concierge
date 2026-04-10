@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vela — Design Direction</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Inter:wght@300;400;500&family=Didact+Gothic&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #0a0a0a;
+    color: #f0ede8;
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    padding: 40px 24px 80px;
+  }
+
+  .page-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 300;
+    font-size: 13px;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: #b8965a;
+    text-align: center;
+    margin-bottom: 8px;
+  }
+
+  .page-subtitle {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 300;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(240,237,232,0.4);
+    text-align: center;
+    margin-bottom: 56px;
+  }
+
+  .directions {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .direction {
+    cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 4px;
+    overflow: hidden;
+    transition: border-color 0.3s, transform 0.3s;
+    position: relative;
+  }
+
+  .direction:hover { border-color: rgba(184,150,90,0.4); transform: translateY(-3px); }
+  .direction.selected { border-color: #b8965a; }
+  .direction.selected::after {
+    content: '✓ Selected';
+    position: absolute;
+    top: 12px; right: 12px;
+    background: #b8965a;
+    color: #0a0a0a;
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 4px 8px;
+    border-radius: 2px;
+    z-index: 10;
+  }
+
+  .phone {
+    width: 100%;
+    aspect-ratio: 9/18;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .dir-label {
+    padding: 16px;
+    border-top: 1px solid rgba(255,255,255,0.07);
+  }
+
+  .dir-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 16px;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    color: #f0ede8;
+    margin-bottom: 4px;
+  }
+
+  .dir-desc {
+    font-size: 11px;
+    font-weight: 300;
+    color: rgba(240,237,232,0.45);
+    letter-spacing: 0.05em;
+    line-height: 1.6;
+  }
+
+  /* ── DIRECTION A: Noir Void ────────────────────────────────── */
+  .phone-a {
+    background: #020202;
+    display: flex;
+    flex-direction: column;
+    padding: 32px 20px 20px;
+  }
+
+  .a-status {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 40px;
+    opacity: 0.4;
+  }
+
+  .a-status span { font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; color: #fff; }
+
+  .a-logo {
+    margin-bottom: 64px;
+    text-align: center;
+  }
+
+  .a-logo-mark {
+    width: 28px;
+    height: 28px;
+    border: 0.5px solid rgba(255,255,255,0.25);
+    transform: rotate(45deg);
+    margin: 0 auto 20px;
+  }
+
+  .a-wordmark {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 300;
+    font-size: 26px;
+    letter-spacing: 0.55em;
+    text-transform: uppercase;
+    color: #fff;
+    text-indent: 0.55em;
+  }
+
+  .a-sub {
+    font-size: 7.5px;
+    letter-spacing: 0.45em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.22);
+    text-indent: 0.45em;
+    margin-top: 8px;
+    text-align: center;
+  }
+
+  .a-hero-text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+  }
+
+  .a-eyebrow {
+    font-size: 7px;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.28);
+    margin-bottom: 12px;
+  }
+
+  .a-headline {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 300;
+    font-size: 34px;
+    line-height: 1.1;
+    letter-spacing: 0.01em;
+    color: #fff;
+    margin-bottom: 10px;
+  }
+
+  .a-headline em {
+    font-style: italic;
+    color: rgba(255,255,255,0.55);
+  }
+
+  .a-body {
+    font-size: 10px;
+    font-weight: 300;
+    line-height: 1.7;
+    color: rgba(255,255,255,0.32);
+    letter-spacing: 0.03em;
+    max-width: 200px;
+    margin-bottom: 28px;
+  }
+
+  .a-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 8px;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.5);
+  }
+
+  .a-cta::after {
+    content: '';
+    display: block;
+    width: 24px;
+    height: 0.5px;
+    background: rgba(255,255,255,0.3);
+  }
+
+  .a-nav {
+    display: flex;
+    justify-content: space-between;
+    padding-top: 20px;
+    border-top: 0.5px solid rgba(255,255,255,0.07);
+    margin-top: 24px;
+  }
+
+  .a-nav span {
+    font-size: 7px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.2);
+  }
+
+  .a-nav span.active { color: rgba(255,255,255,0.7); }
+
+  /* ── DIRECTION B: Golden Atelier ───────────────────────────── */
+  .phone-b {
+    background: #08070a;
+    display: flex;
+    flex-direction: column;
+    padding: 28px 20px 18px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .phone-b::before {
+    content: '';
+    position: absolute;
+    top: -40px; left: 50%;
+    transform: translateX(-50%);
+    width: 220px; height: 220px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(184,150,90,0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .b-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 36px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .b-logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .b-diamond {
+    width: 14px; height: 14px;
+    border: 1px solid #b8965a;
+    transform: rotate(45deg);
+  }
+
+  .b-wordmark {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 16px;
+    font-weight: 400;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: #e8d5b0;
+  }
+
+  .b-icons { display: flex; gap: 14px; }
+  .b-icon {
+    width: 28px; height: 28px;
+    border: 0.5px solid rgba(184,150,90,0.25);
+    border-radius: 50%;
+    background: rgba(184,150,90,0.04);
+  }
+
+  .b-hero {
+    position: relative;
+    flex: 1.4;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+
+  .b-hero-img {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(160deg, #1a1410 0%, #0d0b08 40%, #151210 100%);
+    position: relative;
+  }
+
+  .b-hero-img::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 70% 50% at 50% 40%, rgba(184,150,90,0.14) 0%, transparent 65%),
+      radial-gradient(circle at 50% 90%, rgba(184,150,90,0.06) 0%, transparent 50%);
+  }
+
+  .b-ring-placeholder {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 70px; height: 70px;
+    border: 1.5px solid rgba(184,150,90,0.5);
+    border-radius: 50%;
+    box-shadow: 0 0 24px rgba(184,150,90,0.15), inset 0 0 16px rgba(184,150,90,0.08);
+  }
+
+  .b-ring-placeholder::before {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 12px; height: 12px;
+    background: rgba(184,150,90,0.6);
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+    box-shadow: 0 0 12px rgba(184,150,90,0.4);
+  }
+
+  .b-hero-caption {
+    position: absolute;
+    bottom: 16px; left: 16px; right: 16px;
+  }
+
+  .b-eyebrow {
+    font-size: 7px;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: #b8965a;
+    margin-bottom: 6px;
+  }
+
+  .b-headline {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 400;
+    font-size: 26px;
+    line-height: 1.1;
+    color: #f0ede8;
+  }
+
+  .b-headline em {
+    font-style: italic;
+    color: #d4a96a;
+  }
+
+  .b-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    flex: 1;
+  }
+
+  .b-card {
+    background: rgba(255,255,255,0.025);
+    border: 0.5px solid rgba(184,150,90,0.15);
+    border-radius: 2px;
+    padding: 12px 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  .b-card-icon {
+    width: 20px; height: 20px;
+    border: 0.5px solid rgba(184,150,90,0.3);
+    border-radius: 50%;
+    margin-bottom: 16px;
+  }
+
+  .b-card-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 13px;
+    font-weight: 400;
+    color: #e8d5b0;
+    letter-spacing: 0.04em;
+  }
+
+  .b-card-sub {
+    font-size: 7px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(240,237,232,0.3);
+    margin-top: 2px;
+  }
+
+  .b-nav {
+    display: flex;
+    justify-content: space-between;
+    padding-top: 14px;
+    border-top: 0.5px solid rgba(184,150,90,0.12);
+    margin-top: 14px;
+  }
+
+  .b-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .b-nav-dot {
+    width: 18px; height: 1.5px;
+    border-radius: 1px;
+    background: transparent;
+  }
+
+  .b-nav-dot.active { background: #b8965a; }
+
+  .b-nav-icon {
+    width: 18px; height: 18px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 50%;
+  }
+
+  .b-nav-icon.active { background: rgba(184,150,90,0.2); }
+
+  .b-nav-label {
+    font-size: 6.5px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: rgba(240,237,232,0.3);
+  }
+
+  .b-nav-label.active { color: #b8965a; }
+
+  /* ── DIRECTION C: Champagne Editorial ──────────────────────── */
+  .phone-c {
+    background: #070608;
+    display: flex;
+    flex-direction: column;
+    padding: 28px 0 18px;
+    position: relative;
+  }
+
+  .c-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 20px;
+    margin-bottom: 28px;
+  }
+
+  .c-issue {
+    font-size: 7px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.2);
+  }
+
+  .c-wordmark {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 300;
+    font-size: 20px;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: #f5e6c8;
+    text-indent: 0.35em;
+  }
+
+  .c-icons { display: flex; gap: 10px; }
+  .c-icon { width: 24px; height: 24px; background: rgba(255,255,255,0.05); border-radius: 50%; }
+
+  .c-hero {
+    padding: 0 20px;
+    margin-bottom: 24px;
+    position: relative;
+  }
+
+  .c-vol-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .c-vol-line {
+    flex: 1;
+    height: 0.5px;
+    background: rgba(245,230,200,0.15);
+  }
+
+  .c-vol-text {
+    font-size: 7px;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: rgba(245,230,200,0.35);
+  }
+
+  .c-big-headline {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 300;
+    font-size: 46px;
+    line-height: 0.95;
+    letter-spacing: -0.01em;
+    color: #f5e6c8;
+    margin-bottom: 16px;
+  }
+
+  .c-big-headline em {
+    font-style: italic;
+    font-weight: 300;
+    display: block;
+    color: rgba(245,230,200,0.5);
+    font-size: 36px;
+  }
+
+  .c-lede {
+    font-size: 10px;
+    font-weight: 300;
+    line-height: 1.65;
+    color: rgba(245,230,200,0.38);
+    max-width: 220px;
+    letter-spacing: 0.02em;
+  }
+
+  .c-feature {
+    position: relative;
+    height: 160px;
+    margin-bottom: 24px;
+    overflow: hidden;
+  }
+
+  .c-feature-bg {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, #111018 0%, #0d0c10 50%, #0f0d14 100%);
+  }
+
+  .c-feature-bg::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 60% 60% at 50% 40%, rgba(200,168,110,0.1) 0%, transparent 70%);
+  }
+
+  .c-feature-ring {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80px; height: 80px;
+    border: 1px solid rgba(200,168,110,0.35);
+    border-radius: 50%;
+  }
+
+  .c-feature-ring::before {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 50px; height: 50px;
+    border: 0.5px solid rgba(200,168,110,0.2);
+    border-radius: 50%;
+  }
+
+  .c-feature-overlay {
+    position: absolute;
+    bottom: 16px; right: 16px;
+    text-align: right;
+  }
+
+  .c-feature-label {
+    font-size: 7px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: rgba(200,168,110,0.6);
+  }
+
+  .c-feature-price {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px;
+    font-weight: 300;
+    color: #f5e6c8;
+    letter-spacing: 0.02em;
+  }
+
+  .c-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: rgba(255,255,255,0.05);
+    margin: 0 0 20px;
+  }
+
+  .c-grid-item {
+    background: #070608;
+    padding: 14px 16px;
+  }
+
+  .c-grid-num {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 28px;
+    font-weight: 300;
+    color: rgba(245,230,200,0.2);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .c-grid-label {
+    font-size: 7px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: rgba(245,230,200,0.35);
+  }
+
+  .c-nav {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 20px;
+    border-top: 0.5px solid rgba(255,255,255,0.06);
+    padding-top: 14px;
+  }
+
+  .c-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .c-nav-icon {
+    width: 20px; height: 20px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 50%;
+  }
+
+  .c-nav-icon.active { background: rgba(200,168,110,0.18); }
+
+  .c-nav-label {
+    font-size: 6.5px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: rgba(245,230,200,0.25);
+  }
+
+  .c-nav-label.active { color: rgba(200,168,110,0.8); }
+
+  /* Confirm btn */
+  .confirm-row {
+    text-align: center;
+    margin-top: 48px;
+  }
+
+  .confirm-btn {
+    background: transparent;
+    border: 0.5px solid rgba(184,150,90,0.5);
+    color: #b8965a;
+    font-family: 'Inter', sans-serif;
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    padding: 14px 40px;
+    cursor: pointer;
+    transition: all 0.25s;
+    border-radius: 1px;
+  }
+
+  .confirm-btn:hover {
+    background: rgba(184,150,90,0.08);
+    border-color: #b8965a;
+    color: #d4a96a;
+  }
+</style>
+</head>
+<body>
+
+<p class="page-title">Vela — Luxury Design Direction</p>
+<p class="page-subtitle">Three aesthetic systems for the epitome of bespoke jewellery digital experience</p>
+
+<div class="directions">
+
+  <!-- A: NOIR VOID -->
+  <div class="direction" id="dir-a" onclick="select('a')">
+    <div class="phone phone-a">
+      <div class="a-status">
+        <span>9:41</span>
+        <span>●●● ▲</span>
+      </div>
+      <div class="a-logo">
+        <div class="a-logo-mark"></div>
+        <div class="a-wordmark">Vela</div>
+        <div class="a-sub">Bespoke Jewellers</div>
+      </div>
+      <div class="a-hero-text">
+        <div class="a-eyebrow">The Atelier · SS 2026</div>
+        <div class="a-headline">Craft<br>Your<br><em>Legacy.</em></div>
+        <div class="a-body">Master craftsman Paul Ginocchi. Forty years. One ring at a time.</div>
+        <div class="a-cta">Begin your commission</div>
+      </div>
+      <div class="a-nav">
+        <span class="active">Atelier</span>
+        <span>Design</span>
+        <span>3D Build</span>
+        <span>Journey</span>
+        <span>Profile</span>
+      </div>
+    </div>
+    <div class="dir-label">
+      <div class="dir-name">Noir Void</div>
+      <div class="dir-desc">Pure black, extreme tracking, negative space as luxury. Maison Margiela meets Loro Piana. Zero ornament — everything is typography and tension.</div>
+    </div>
+  </div>
+
+  <!-- B: GOLDEN ATELIER -->
+  <div class="direction" id="dir-b" onclick="select('b')">
+    <div class="phone phone-b">
+      <div class="b-header">
+        <div class="b-logo">
+          <div class="b-diamond"></div>
+          <div class="b-wordmark">Vela</div>
+        </div>
+        <div class="b-icons">
+          <div class="b-icon"></div>
+          <div class="b-icon"></div>
+          <div class="b-icon"></div>
+        </div>
+      </div>
+
+      <div class="b-hero">
+        <div class="b-hero-img">
+          <div class="b-ring-placeholder"></div>
+        </div>
+        <div class="b-hero-caption">
+          <div class="b-eyebrow">The Atelier</div>
+          <div class="b-headline">Craft Your<br><em>Legacy</em></div>
+        </div>
+      </div>
+
+      <div class="b-cards">
+        <div class="b-card">
+          <div class="b-card-icon"></div>
+          <div>
+            <div class="b-card-name">AI Design</div>
+            <div class="b-card-sub">Generate concepts</div>
+          </div>
+        </div>
+        <div class="b-card">
+          <div class="b-card-icon"></div>
+          <div>
+            <div class="b-card-name">3D Build</div>
+            <div class="b-card-sub">Configure ring</div>
+          </div>
+        </div>
+        <div class="b-card">
+          <div class="b-card-icon"></div>
+          <div>
+            <div class="b-card-name">Try On</div>
+            <div class="b-card-sub">AR experience</div>
+          </div>
+        </div>
+        <div class="b-card">
+          <div class="b-card-icon"></div>
+          <div>
+            <div class="b-card-name">Journey</div>
+            <div class="b-card-sub">Your order</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="b-nav">
+        <div class="b-nav-item">
+          <div class="b-nav-dot active"></div>
+          <div class="b-nav-icon active"></div>
+          <div class="b-nav-label active">Home</div>
+        </div>
+        <div class="b-nav-item">
+          <div class="b-nav-dot"></div>
+          <div class="b-nav-icon"></div>
+          <div class="b-nav-label">Design</div>
+        </div>
+        <div class="b-nav-item">
+          <div class="b-nav-dot"></div>
+          <div class="b-nav-icon"></div>
+          <div class="b-nav-label">3D</div>
+        </div>
+        <div class="b-nav-item">
+          <div class="b-nav-dot"></div>
+          <div class="b-nav-icon"></div>
+          <div class="b-nav-label">Try On</div>
+        </div>
+        <div class="b-nav-item">
+          <div class="b-nav-dot"></div>
+          <div class="b-nav-icon"></div>
+          <div class="b-nav-label">Journey</div>
+        </div>
+      </div>
+    </div>
+    <div class="dir-label">
+      <div class="dir-name">Golden Atelier</div>
+      <div class="dir-desc">Deep black with warm 18k gold accents. Cartier meets a digital jewellery box. Serif headlines, tactile card surfaces, gold glow on the ring canvas.</div>
+    </div>
+  </div>
+
+  <!-- C: CHAMPAGNE EDITORIAL -->
+  <div class="direction" id="dir-c" onclick="select('c')">
+    <div class="phone phone-c">
+      <div class="c-header">
+        <div class="c-issue">No. 001 · 2026</div>
+        <div class="c-wordmark">Vela</div>
+        <div class="c-icons">
+          <div class="c-icon"></div>
+          <div class="c-icon"></div>
+        </div>
+      </div>
+
+      <div class="c-hero">
+        <div class="c-vol-label">
+          <div class="c-vol-line"></div>
+          <div class="c-vol-text">Bespoke Atelier</div>
+          <div class="c-vol-line"></div>
+        </div>
+        <div class="c-big-headline">Craft<br>Your<em>Legacy.</em></div>
+        <div class="c-lede">Paul Ginocchi's 40 years of mastery. Every ring a singular work.</div>
+      </div>
+
+      <div class="c-feature">
+        <div class="c-feature-bg"></div>
+        <div class="c-feature-ring"></div>
+        <div class="c-feature-overlay">
+          <div class="c-feature-label">From</div>
+          <div class="c-feature-price">£3,800</div>
+        </div>
+      </div>
+
+      <div class="c-grid">
+        <div class="c-grid-item">
+          <div class="c-grid-num">AI</div>
+          <div class="c-grid-label">Design Studio</div>
+        </div>
+        <div class="c-grid-item">
+          <div class="c-grid-num">3D</div>
+          <div class="c-grid-label">Configurator</div>
+        </div>
+        <div class="c-grid-item">
+          <div class="c-grid-num">AR</div>
+          <div class="c-grid-label">Virtual Try-On</div>
+        </div>
+        <div class="c-grid-item">
+          <div class="c-grid-num">40</div>
+          <div class="c-grid-label">Years of craft</div>
+        </div>
+      </div>
+
+      <div class="c-nav">
+        <div class="c-nav-item">
+          <div class="c-nav-icon active"></div>
+          <div class="c-nav-label active">Home</div>
+        </div>
+        <div class="c-nav-item">
+          <div class="c-nav-icon"></div>
+          <div class="c-nav-label">Design</div>
+        </div>
+        <div class="c-nav-item">
+          <div class="c-nav-icon"></div>
+          <div class="c-nav-label">Build</div>
+        </div>
+        <div class="c-nav-item">
+          <div class="c-nav-icon"></div>
+          <div class="c-nav-label">Try On</div>
+        </div>
+        <div class="c-nav-item">
+          <div class="c-nav-icon"></div>
+          <div class="c-nav-label">Journey</div>
+        </div>
+      </div>
+    </div>
+    <div class="dir-label">
+      <div class="dir-name">Champagne Editorial</div>
+      <div class="dir-desc">Magazine-grade typography. Giant Cormorant headlines, editorial grid, champagne gold tones. Vogue meets Wallpaper* for a jewellery atelier.</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="confirm-row">
+  <button class="confirm-btn" onclick="confirmSelection()">Confirm Direction →</button>
+</div>
+
+<script>
+  let selected = null;
+
+  function select(id) {
+    document.querySelectorAll('.direction').forEach(el => el.classList.remove('selected'));
+    const el = document.getElementById('dir-' + id);
+    if (el) { el.classList.add('selected'); selected = id; }
+  }
+
+  function confirmSelection() {
+    if (!selected) { alert('Please select a direction first.'); return; }
+    const names = { a: 'Noir Void', b: 'Golden Atelier', c: 'Champagne Editorial' };
+    if (window.__companion_select) {
+      window.__companion_select(selected, names[selected]);
+    }
+  }
+
+  // Inject selection helper compatible with brainstorm companion protocol
+  window.__companion_select = function(choice, text) {
+    const ev = { type: 'click', choice, text, timestamp: Date.now() };
+    fetch('/event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(ev)
+    }).catch(() => {});
+    document.querySelectorAll('.direction').forEach(el => el.classList.remove('selected'));
+    const el = document.getElementById('dir-' + choice);
+    if (el) el.classList.add('selected');
+  };
+</script>
+
+</body>
+</html>

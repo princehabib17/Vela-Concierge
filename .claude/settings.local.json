@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__filesystem__directory_tree",
+      "Skill(react-patterns)",
+      "Skill(react-patterns:*)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(bash \"C:\\\\Users\\\\HP\\\\.claude\\\\plugins\\\\cache\\\\claude-plugins-official\\\\superpowers\\\\5.0.7\\\\skills\\\\brainstorming\\\\scripts\\\\start-server.sh\" --project-dir \"C:\\\\Users\\\\HP\\\\.antigravity\\\\projects\\\\Vela-Concierge\")",
+      "Bash(python \"C:\\\\Users\\\\HP\\\\.claude\\\\skills\\\\ui-ux-pro-max\\\\scripts\\\\search.py\" \"luxury bespoke jewellery atelier dark gold serif mobile premium\" --design-system -p \"Vela\")"
+    ]
+  }
+}

@@ -1,111 +1,207 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Cardo:wght@400;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&display=swap');
 @import "tailwindcss";
 
+/* ─── Design Tokens ──────────────────────────────────────────────── */
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Playfair Display", ui-serif, Georgia, serif;
-  --font-lux-ui: "Gotham", "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-lux-display: "Cardon", "Cardo", "Playfair Display", ui-serif, Georgia, serif;
-  
-  --color-vela-black: #050505;
-  --color-vela-dark: #111111;
-  --color-vela-gold: #FBDE93;
+
+  /* Brand palette */
+  --color-vela-black:      #050505;
+  --color-vela-dark:       #111111;
+  --color-vela-gold:       #FBDE93;
   --color-vela-gold-muted: #c2a86b;
-  --color-vela-light: #f5f5f5;
-  --color-vela-gray: #333333;
+  --color-vela-gold-deep:  #9b7a2a;
+  --color-vela-light:      #f5f5f5;
+  --color-vela-gray:       #333333;
+
+  /* Animation tokens */
+  --animate-shimmer:    shimmer 3.2s ease-in-out infinite;
+  --animate-glow-pulse: glow-pulse 2.4s ease-in-out infinite;
+  --animate-float:      float 4s ease-in-out infinite;
+
+  @keyframes shimmer {
+    0%   { background-position: -200% center; }
+    100% { background-position:  200% center; }
+  }
+
+  @keyframes glow-pulse {
+    0%, 100% { opacity: 0.55; }
+    50%       { opacity: 1; }
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50%       { transform: translateY(-6px); }
+  }
 }
 
+/* ─── Configurator light-theme surface vars (used by Configurator3D) */
 @layer base {
-  html,
-  body {
-    height: 100%;
-    margin: 0;
-    overflow: hidden;
+  :root {
+    --lux-bg:           #f1f1f1;
+    --lux-surface:      #ffffff;
+    --lux-text-primary: #121212;
+    --lux-text-muted:   #707070;
+    --lux-accent:       #fbde93;
+    --lux-border:       #d8d8d8;
+    --lux-border-strong:#121212;
+    --lux-radius-sm:    10px;
+    --lux-radius-md:    14px;
+    --lux-shadow-soft:  0 10px 40px rgba(0, 0, 0, 0.06);
   }
+}
 
-  #root {
-    height: 100%;
-    min-height: 100dvh;
-  }
+/* ─── Base ───────────────────────────────────────────────────────── */
+@layer base {
+  html, body { height: 100%; margin: 0; overflow: hidden; }
 
-  body {
-    @apply bg-vela-black text-vela-light font-sans antialiased;
-  }
-  
+  #root { height: 100%; min-height: 100dvh; }
+
+  body { @apply bg-vela-black text-vela-light font-sans antialiased; }
+
   h1, h2, h3, h4, h5, h6 {
     @apply font-serif font-normal tracking-wide;
   }
 }
 
-@layer base {
-  :root {
-    --lux-bg: #f1f1f1;
-    --lux-surface: #ffffff;
-    --lux-text-primary: #121212;
-    --lux-text-muted: #707070;
-    --lux-accent: #fbde93;
-    --lux-border: #d8d8d8;
-    --lux-border-strong: #121212;
-
-    --lux-space-8: 8px;
-    --lux-space-12: 12px;
-    --lux-space-16: 16px;
-    --lux-space-24: 24px;
-    --lux-space-32: 32px;
-
-    --lux-radius-sm: 8px;
-    --lux-radius-md: 12px;
-    --lux-radius-lg: 16px;
-    --lux-pill: 999px;
-
-    --lux-shadow-soft: 0 8px 24px rgba(18, 18, 18, 0.08);
-  }
-}
-
+/* ─── Utilities ──────────────────────────────────────────────────── */
 @layer utilities {
-  .lux-bg {
-    background-color: var(--lux-bg);
+  /* Scroll container for every atelier route */
+  .vela-page {
+    @apply px-6 pt-6;
+    padding-bottom: calc(5.25rem + env(safe-area-inset-bottom, 0px));
   }
 
-  .lux-surface {
-    background-color: var(--lux-surface);
+  /* Typography scale (hierarchy = kicker → title → lede → body → micro) */
+  .vela-kicker {
+    @apply mb-2 text-[10px] font-medium uppercase tracking-[0.22em] text-vela-gold;
+  }
+  /* Kicker text without default margin (stack spacing manually) */
+  .vela-kicker-text {
+    @apply text-[10px] font-medium uppercase tracking-[0.22em] text-vela-gold;
+  }
+  .vela-hero-title {
+    @apply font-serif text-4xl font-normal leading-[1.08] tracking-[0.02em] text-vela-light;
+  }
+  .vela-type-display {
+    @apply font-serif text-3xl font-normal leading-[1.12] tracking-[0.02em] text-vela-light sm:text-4xl;
+  }
+  .vela-page-title {
+    @apply font-serif text-2xl font-normal leading-tight tracking-[0.02em] text-vela-light;
+  }
+  .vela-type-section {
+    @apply font-serif text-lg font-normal tracking-[0.03em] text-vela-light;
+  }
+  .vela-page-lede {
+    @apply mt-2 max-w-sm text-sm font-light leading-relaxed text-vela-light/60;
+  }
+  .vela-type-body {
+    @apply font-sans text-sm font-light leading-relaxed text-vela-light/85;
+  }
+  .vela-type-micro {
+    @apply font-sans text-[9px] font-medium uppercase tracking-[0.14em] text-vela-light/50;
+  }
+  .vela-type-ui-title {
+    @apply font-sans text-sm font-medium tracking-wide text-vela-light;
+  }
+  .vela-type-caption {
+    @apply text-[11px] font-light leading-relaxed text-vela-light/50;
+  }
+  .vela-card-label {
+    @apply text-[10px] font-medium uppercase tracking-[0.18em] text-vela-light/55;
+  }
+  .vela-field-label {
+    @apply mb-1 text-[10px] font-medium uppercase tracking-[0.14em] text-vela-light/50;
+  }
+  .vela-type-card-hero {
+    @apply font-serif text-xl font-normal tracking-[0.03em] text-vela-light;
+  }
+  .vela-wordmark {
+    @apply font-serif text-lg uppercase tracking-[0.14em] text-vela-light;
+  }
+  .vela-splash-subtitle {
+    @apply text-[10px] font-light uppercase tracking-[0.32em] text-vela-light/55;
+  }
+  .vela-btn-primary {
+    @apply rounded-xl bg-vela-gold py-4 text-center text-sm font-medium uppercase tracking-[0.12em] text-vela-black transition-colors hover:bg-vela-gold-muted disabled:cursor-not-allowed disabled:opacity-45;
   }
 
-  .lux-text {
-    color: var(--lux-text-primary);
+  /* Vertical rhythm (prefer over ad-hoc gap-y) */
+  /* 4px grid: 2=8px, 3=12px, 4=16px, 6=24px, 8=32px, 12=48px, 16=64px */
+  .vela-stack-tight { @apply flex flex-col gap-2; }
+  .vela-stack       { @apply flex flex-col gap-4; }
+  .vela-stack-loose { @apply flex flex-col gap-6; }
+  .vela-section-gap { @apply space-y-6; }
+  .vela-inset-card  { @apply p-4 sm:p-6; }
+
+  /* Surface / icon tokens */
+  .vela-card-surface { @apply rounded-xl border border-vela-gray/25 bg-vela-dark; }
+  .vela-icon-btn {
+    @apply rounded-full p-2 text-vela-light/75 transition-colors
+           hover:text-vela-gold
+           focus-visible:outline focus-visible:outline-2
+           focus-visible:outline-offset-2 focus-visible:outline-vela-gold/60;
   }
 
-  .lux-muted {
-    color: var(--lux-text-muted);
+  /* Gold text gradient — hero / accent only; avoid on body copy (maison calm) */
+  .vela-text-gold {
+    background: linear-gradient(135deg, #FBDE93 0%, #e8c56a 45%, #FBDE93 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: var(--animate-shimmer);
   }
 
-  .lux-accent {
-    color: #9b7a2a;
+  /* Gold shimmer overlay (apply to a ::before / absolute div) */
+  .vela-shimmer-overlay {
+    background: linear-gradient(
+      105deg,
+      transparent 40%,
+      rgba(251, 222, 147, 0.07) 50%,
+      transparent 60%
+    );
+    background-size: 200% 100%;
+    animation: var(--animate-shimmer);
   }
 
-  .lux-border {
-    border-color: var(--lux-border);
+  /* Glow pulse for active indicators */
+  .vela-glow { animation: var(--animate-glow-pulse); }
+
+  /* Float for decorative elements */
+  .vela-float { animation: var(--animate-float); }
+
+  /* Lux configurator aliases */
+  .lux-bg      { background-color: var(--lux-bg); }
+  .lux-surface { background-color: var(--lux-surface); }
+  .lux-text    { color: var(--lux-text-primary); }
+  .lux-muted   { color: var(--lux-text-muted); }
+  .lux-accent  { color: #9b7a2a; }
+  .lux-border  { border-color: var(--lux-border); }
+  .lux-ui      { font-family: var(--font-sans); letter-spacing: 0.04em; }
+  .lux-display { font-family: var(--font-serif); letter-spacing: 0.02em; }
+  /* Mirrors dark-route hierarchy on light configurator */
+  .lux-kicker {
+    @apply lux-ui text-[10px] font-medium uppercase tracking-[0.2em] text-[#9b7a2a];
+  }
+  .lux-page-title {
+    @apply lux-display text-xl font-normal leading-tight tracking-tight text-[#121212];
+  }
+  .lux-page-lede {
+    @apply lux-ui mt-0.5 text-[10px] font-normal uppercase tracking-[0.16em] text-[#707070];
+  }
+  .lux-chip {
+    @apply lux-ui inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border px-5 text-[10px] font-medium uppercase tracking-[0.14em] transition-colors;
+  }
+  .lux-chip-inactive {
+    @apply border-[#d8d8d8] bg-white text-[#121212] hover:border-[#b8b8b8];
+  }
+  .lux-chip-active {
+    @apply border-[#121212] bg-[#121212] text-[#f5f5f5];
   }
 
-  .lux-ui {
-    font-family: var(--font-lux-ui);
-    letter-spacing: 0.04em;
-  }
-
-  .lux-display {
-    font-family: var(--font-lux-display);
-    letter-spacing: 0.02em;
-  }
-
-  /* Hide scrollbars but keep touch/mouse scroll (mobile studio panels) */
-  .no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-
-  .no-scrollbar::-webkit-scrollbar {
-    display: none;
-    width: 0;
-    height: 0;
-  }
+  /* Scrollbar hide */
+  .no-scrollbar                   { -ms-overflow-style: none; scrollbar-width: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; width: 0; height: 0; }
 }
