@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Home as HomeIcon, Sparkles, Box, Camera, Map, Ruler, Diamond, User } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { cn } from './lib/utils';
 
 // Components for pages
@@ -16,37 +16,40 @@ import Profile from './pages/Profile';
 import Wishlist from './pages/Wishlist';
 
 function SplashScreen() {
-  const [isVisible, setIsVisible] = useState(true);
+  /** visible → fading (pointer-events off so UI is usable while overlay fades) → unmounted */
+  const [phase, setPhase] = useState<'visible' | 'fading' | 'off'>('visible');
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsVisible(false);
-    }, 2500);
-    return () => clearTimeout(timer);
+    const startFade = setTimeout(() => setPhase('fading'), 2400);
+    const remove = setTimeout(() => setPhase('off'), 2400 + 800);
+    return () => {
+      clearTimeout(startFade);
+      clearTimeout(remove);
+    };
   }, []);
 
+  if (phase === 'off') return null;
+
   return (
-    <AnimatePresence>
-      {isVisible && (
-        <motion.div
-          initial={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.8, ease: "easeInOut" }}
-          className="fixed inset-0 z-[100] bg-vela-black flex flex-col items-center justify-center"
-        >
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0, filter: 'blur(10px)' }}
-            animate={{ scale: 1, opacity: 1, filter: 'blur(0px)' }}
-            transition={{ duration: 1.5, ease: "easeOut" }}
-            className="flex flex-col items-center"
-          >
-            <Diamond className="text-vela-gold mb-8" size={48} strokeWidth={1} />
-            <h1 className="text-5xl font-serif tracking-[0.3em] text-vela-gold mb-4 uppercase ml-3">Vela</h1>
-            <p className="text-vela-light/60 text-xs font-light tracking-[0.4em] uppercase ml-1">Bespoke Jewellers</p>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <motion.div
+      aria-hidden={phase === 'fading'}
+      initial={{ opacity: 1 }}
+      animate={{ opacity: phase === 'fading' ? 0 : 1 }}
+      transition={{ duration: 0.8, ease: 'easeInOut' }}
+      className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-vela-black"
+      style={{ pointerEvents: phase === 'fading' ? 'none' : 'auto' }}
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0, filter: 'blur(10px)' }}
+        animate={{ scale: 1, opacity: 1, filter: 'blur(0px)' }}
+        transition={{ duration: 1.5, ease: 'easeOut' }}
+        className="flex flex-col items-center"
+      >
+        <Diamond className="mb-8 text-vela-gold" size={48} strokeWidth={1} />
+        <h1 className="mb-4 ml-3 text-5xl font-serif uppercase tracking-[0.3em] text-vela-gold">Vela</h1>
+        <p className="ml-1 text-xs font-light uppercase tracking-[0.4em] text-vela-light/60">Bespoke Jewellers</p>
+      </motion.div>
+    </motion.div>
   );
 }
 
