@@ -65,6 +65,16 @@
   }
 }
 
+/* ─── Registered custom utilities (safe to use with @apply) ─────── */
+@utility lux-ui {
+  font-family: var(--font-sans);
+  letter-spacing: 0.04em;
+}
+@utility lux-display {
+  font-family: var(--font-serif);
+  letter-spacing: 0.02em;
+}
+
 /* ─── Utilities ──────────────────────────────────────────────────── */
 @layer utilities {
   /* Scroll container for every atelier route */
@@ -179,8 +189,6 @@
   .lux-muted   { color: var(--lux-text-muted); }
   .lux-accent  { color: #9b7a2a; }
   .lux-border  { border-color: var(--lux-border); }
-  .lux-ui      { font-family: var(--font-sans); letter-spacing: 0.04em; }
-  .lux-display { font-family: var(--font-serif); letter-spacing: 0.02em; }
   /* Mirrors dark-route hierarchy on light configurator */
   .lux-kicker {
     @apply lux-ui text-[10px] font-medium uppercase tracking-[0.2em] text-[#9b7a2a];

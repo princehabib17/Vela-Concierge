@@ -1,7 +1,7 @@
 import { useState, Suspense, useRef, useMemo, Component, type ReactNode, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber';
-import { OrbitControls, Environment, Text, Float, ContactShadows, Html } from '@react-three/drei';
+import { OrbitControls, Environment, Lightformer, Text, Float, ContactShadows, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -60,7 +60,7 @@ function Loading3D() {
 const LOOK_AT = new THREE.Vector3(0, 0, 0);
 
 const VIEW_TARGETS: Record<'hero' | 'top' | 'profile', [number, number, number]> = {
-  hero: [0, 0.22, 1.42],
+  hero: [0, 0.3, 2.15],
   top: [0, 2.05, 0.92],
   profile: [1.95, 0.18, 0.12],
 };
@@ -324,7 +324,7 @@ export default function Configurator3D() {
   ];
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden lux-bg lux-text">
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lux-bg lux-text">
       {/* ── Studio header: hierarchy + estimate ── */}
       <header className="shrink-0 border-b border-[var(--lux-border)] px-5 pb-5 pt-[max(0.5rem,env(safe-area-inset-top))]">
         <Link
@@ -415,7 +415,17 @@ export default function Configurator3D() {
             <pointLight position={[0, 4, 1]} intensity={1.15} />
             <Suspense fallback={<Loading3D />}>
               <RingModel {...config} />
-              <Environment preset="studio" />
+              {/* Procedural studio env — no runtime CDN fetch (preset HDRs killed the canvas offline) */}
+              <Environment resolution={256}>
+                {/* Mid-grey backdrop keeps transmissive gems luminous; softboxes give metal its shape */}
+                <color attach="background" args={['#5a5a5a']} />
+                <Lightformer intensity={4} position={[0, 5, -2]} rotation-x={Math.PI / 2} scale={[10, 6, 1]} />
+                <Lightformer intensity={2.2} position={[-5, 2, 2]} rotation-y={Math.PI / 2} scale={[8, 3, 1]} />
+                <Lightformer intensity={2.2} position={[5, 2, 2]} rotation-y={-Math.PI / 2} scale={[8, 3, 1]} />
+                <Lightformer intensity={1.6} position={[0, 1, 6]} scale={[12, 2, 1]} />
+                <Lightformer intensity={1} position={[0, -4, 0]} rotation-x={-Math.PI / 2} scale={[10, 10, 1]} color="#cfcfcf" />
+                <Lightformer intensity={0.8} color="#fbde93" position={[2, 4, 4]} scale={[2, 2, 1]} form="ring" />
+              </Environment>
               <ContactShadows position={[0, -1.15, 0]} opacity={0.18} scale={6} blur={2.6} far={3.5} color="#8f8f8f" />
             </Suspense>
             <OrbitControls
