@@ -1,28 +1,123 @@
-import { useState, Suspense, useRef, useMemo, Component, type ReactNode, useEffect } from 'react';
+import { Component, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber';
-import { OrbitControls, Environment, Text, Float, ContactShadows, Html } from '@react-three/drei';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { ContactShadows, Environment, Html, Lightformer, OrbitControls, Text, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
+import { AnimatePresence, motion } from 'motion/react';
+import { ChevronLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { motion, AnimatePresence } from 'motion/react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { FBXLoader } from 'three-stdlib';
+
+/* ── Config ──────────────────────────────────────────────────────────── */
+
+type Metal = 'yellow gold' | 'white gold' | 'rose gold' | 'platinum';
+type Stone = 'diamond' | 'emerald' | 'sapphire' | 'ruby';
+type Cut = 'round' | 'oval' | 'emerald';
+type Setting = 'prongs' | 'bezel';
+type Band = 'plain' | 'pave';
+
+type RingConfig = {
+  metal: Metal;
+  stone: Stone;
+  cut: Cut;
+  setting: Setting;
+  band: Band;
+  engraving: string;
+};
+
+const STEPS = [
+  { id: 'style', label: 'Style', prompt: 'Select your style' },
+  { id: 'metal', label: 'Metal', prompt: 'Select your metal' },
+  { id: 'stone', label: 'Stone', prompt: 'Select your stone' },
+  { id: 'diamonds', label: 'Diamonds', prompt: 'Select your diamonds' },
+  { id: 'engraving', label: 'Engraving', prompt: 'Add an engraving' },
+] as const;
+
+const OPTIONS = {
+  cut: [
+    { id: 'round', label: 'Round' },
+    { id: 'oval', label: 'Oval' },
+    { id: 'emerald', label: 'Emerald cut' },
+  ],
+  setting: [
+    { id: 'prongs', label: 'Claw' },
+    { id: 'bezel', label: 'Bezel' },
+  ],
+  metal: [
+    { id: 'yellow gold', label: 'Yellow gold' },
+    { id: 'white gold', label: 'White gold' },
+    { id: 'rose gold', label: 'Rose gold' },
+    { id: 'platinum', label: 'Platinum' },
+  ],
+  stone: [
+    { id: 'diamond', label: 'Diamond' },
+    { id: 'emerald', label: 'Emerald' },
+    { id: 'sapphire', label: 'Sapphire' },
+    { id: 'ruby', label: 'Ruby' },
+  ],
+  band: [
+    { id: 'plain', label: 'No diamonds' },
+    { id: 'pave', label: 'Diamond-paved' },
+  ],
+} as const;
+
+const DEFAULT_CONFIG: RingConfig = {
+  metal: 'yellow gold',
+  stone: 'diamond',
+  cut: 'round',
+  setting: 'prongs',
+  band: 'plain',
+  engraving: '',
+};
+
+function estimatePrice(c: RingConfig) {
+  return (
+    2500 +
+    (c.metal === 'platinum' ? 800 : 0) +
+    (c.stone === 'diamond' ? 4500 : 1800) +
+    (c.cut === 'emerald' ? 600 : c.cut === 'oval' ? 300 : 0) +
+    (c.setting === 'bezel' ? 150 : 0) +
+    (c.band === 'pave' ? 400 : 0)
+  );
+}
+
+const label = (list: ReadonlyArray<{ id: string; label: string }>, id: string) =>
+  list.find((o) => o.id === id)?.label ?? id;
+
+/* ── Look ────────────────────────────────────────────────────────────── */
+
+const STAGE = '#ececec';
+const SERIF: CSSProperties = { fontFamily: "'Cardo', 'Cormorant Garamond', Georgia, serif" };
+const MODEL_URL = '/models/ring.glb';
+const FONT_URL = '/fonts/cardo-regular.woff';
+const TARGET = new THREE.Vector3(0, 0.1, 0);
+const INNER_RADIUS = 0.628;
+
+const METAL_LOOK: Record<Metal, { color: string; roughness: number }> = {
+  'yellow gold': { color: '#f0cd8c', roughness: 0.15 },
+  'white gold': { color: '#efede9', roughness: 0.13 },
+  'rose gold': { color: '#eeb09b', roughness: 0.15 },
+  platinum: { color: '#e3e5e8', roughness: 0.11 },
+};
+
+const STONE_LOOK: Record<Stone, { color: string; attenuation: string; distance: number }> = {
+  diamond: { color: '#ffffff', attenuation: '#ffffff', distance: 10 },
+  emerald: { color: '#6fe0a2', attenuation: '#0f8a4c', distance: 0.4 },
+  sapphire: { color: '#6f93ff', attenuation: '#1238c0', distance: 0.4 },
+  ruby: { color: '#ff5d7a', attenuation: '#b30f30', distance: 0.4 },
+};
+
+/* ── 3D ──────────────────────────────────────────────────────────────── */
 
 class CanvasErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
   state = { hasError: false };
-
   static getDerivedStateFromError() {
     return { hasError: true };
   }
-
   render() {
     if (this.state.hasError) {
       return (
-        <div className="absolute inset-0 flex items-center justify-center px-6 text-center">
-          <div className="lux-surface max-w-xs rounded-[var(--lux-radius-md)] border border-[var(--lux-border)] px-5 py-4 shadow-[var(--lux-shadow-soft)]">
-            <p className="lux-kicker">Preview unavailable</p>
-            <p className="lux-ui mt-3 text-sm leading-relaxed text-[#121212]">Refresh the page to reload the ring model.</p>
-          </div>
+        <div className="absolute inset-0 flex items-center justify-center px-6 text-center" style={SERIF}>
+          <p className="text-lg text-black/70">The preview couldn’t load. Please refresh the page.</p>
         </div>
       );
     }
@@ -30,622 +125,458 @@ class CanvasErrorBoundary extends Component<{ children: ReactNode }, { hasError:
   }
 }
 
-type RingConfig = {
-  metal: 'yellow gold' | 'white gold' | 'rose gold' | 'platinum';
-  stone: 'diamond' | 'emerald' | 'sapphire' | 'ruby';
-  shape: 'round' | 'emerald' | 'oval';
-  bandStyle: 'plain' | 'pave';
-  settingStyle: 'solitaire' | 'bezel';
-  engraving: string;
-};
-
-const tabs: Array<{ id: 'metal' | 'band' | 'setting' | 'stone' | 'engrave'; label: string }> = [
-  { id: 'metal', label: 'Metal' },
-  { id: 'band', label: 'Band' },
-  { id: 'setting', label: 'Setting' },
-  { id: 'stone', label: 'Stone' },
-  { id: 'engrave', label: 'Engraving' }
-];
-
 function Loading3D() {
   return (
     <Html center>
-      <div className="lux-surface rounded-[var(--lux-radius-sm)] border border-[var(--lux-border)] px-4 py-2.5 shadow-[var(--lux-shadow-soft)]">
-        <span className="lux-kicker !text-[#707070]">Loading model</span>
-      </div>
+      <p className="animate-pulse whitespace-nowrap text-base italic text-black/45" style={SERIF}>
+        Preparing your ring…
+      </p>
     </Html>
   );
 }
 
-const LOOK_AT = new THREE.Vector3(0, 0, 0);
-
-const VIEW_TARGETS: Record<'hero' | 'top' | 'profile', [number, number, number]> = {
-  hero: [0, 0.22, 1.42],
-  top: [0, 2.05, 0.92],
-  profile: [1.95, 0.18, 0.12],
-};
-
-type OrbitControlsLike = {
-  enabled: boolean;
-  target: THREE.Vector3;
-  update: () => void;
-};
-
-/** Lerp camera only when a view preset is chosen so OrbitControls can orbit freely between presets. */
-function CameraRig({ view }: { view: 'hero' | 'top' | 'profile' }) {
-  const camera = useThree((s) => s.camera);
-
-  const goal = useRef(new THREE.Vector3(...VIEW_TARGETS.hero));
-  const transitioning = useRef(false);
+/** Frames the ring for any viewport: portrait phones pull back, wide screens move in. */
+function FitCamera() {
+  const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
+  const controls = useThree((s) => s.controls) as unknown as
+    | { minDistance: number; maxDistance: number; update: () => void }
+    | null;
+  const width = useThree((s) => s.size.width);
+  const height = useThree((s) => s.size.height);
 
   useEffect(() => {
-    const [x, y, z] = VIEW_TARGETS[view];
-    goal.current.set(x, y, z);
-    transitioning.current = true;
-  }, [view]);
-
-  useFrame((state, delta) => {
-    if (!transitioning.current) return;
-    const controls = state.controls as unknown as OrbitControlsLike | undefined;
-    if (controls) controls.enabled = false;
-
-    const t = 1 - (1 - Math.min(1, delta * 4.8)) ** 2;
-    camera.position.lerp(goal.current, t);
-    camera.lookAt(LOOK_AT);
-    if (camera.position.distanceTo(goal.current) < 0.04) {
-      camera.position.copy(goal.current);
-      camera.lookAt(LOOK_AT);
-      transitioning.current = false;
-      if (controls) {
-        controls.target.copy(LOOK_AT);
-        controls.update();
-        controls.enabled = true;
-      }
+    const t = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+    const aspect = width / height;
+    const dist = Math.max(1.02 / t, 0.92 / (t * aspect)) * 1.12;
+    camera.position.copy(new THREE.Vector3(0.18, 0.3, 1).normalize().multiplyScalar(dist).add(TARGET));
+    camera.lookAt(TARGET);
+    camera.updateProjectionMatrix();
+    if (controls) {
+      controls.minDistance = dist * 0.55;
+      controls.maxDistance = dist * 1.35;
+      controls.update();
     }
-  });
+  }, [camera, controls, width, height]);
 
   return null;
 }
 
-function RingModel({ metal, stone, shape, engraving, bandStyle, settingStyle }: RingConfig) {
-  const group = useRef<THREE.Group>(null);
-  const fbx = useLoader(FBXLoader, '/eternal-pear-ring-free-3d-jewelry-model.FBX');
+function Ring({ config }: { config: RingConfig }) {
+  const { scene } = useGLTF(MODEL_URL);
+  const root = useMemo(() => scene.clone(true), [scene]);
+  const sway = useRef<THREE.Group>(null);
 
-  // Per-metal PBR — each value tuned to real-world material behaviour
-  const materials = useMemo(() => ({
-    // 18k yellow gold: warm, slightly soft, brushed-satin clearcoat
-    'yellow gold': new THREE.MeshPhysicalMaterial({
-      color: '#C9A84C', metalness: 1, roughness: 0.12,
-      clearcoat: 0.6, clearcoatRoughness: 0.08,
-      anisotropy: 0.6, anisotropyRotation: 0.25,
-      envMapIntensity: 2.8,
+  const mats = useMemo(
+    () => ({
+      metal: new THREE.MeshPhysicalMaterial({
+        color: METAL_LOOK['yellow gold'].color,
+        metalness: 1,
+        roughness: 0.15,
+        envMapIntensity: 1.2,
+        clearcoat: 0.3,
+        clearcoatRoughness: 0.04,
+      }),
+      stone: new THREE.MeshPhysicalMaterial({
+        color: '#ffffff',
+        metalness: 0,
+        roughness: 0,
+        transmission: 1,
+        thickness: 0.4,
+        ior: 2.4,
+        dispersion: 0.5,
+        envMapIntensity: 2.4,
+        specularIntensity: 1,
+        attenuationColor: new THREE.Color('#ffffff'),
+        attenuationDistance: 10,
+      }),
+      pave: new THREE.MeshPhysicalMaterial({
+        color: '#ffffff',
+        emissive: new THREE.Color('#ffffff'),
+        emissiveIntensity: 0.32,
+        metalness: 0,
+        roughness: 0.02,
+        ior: 2.4,
+        envMapIntensity: 3.6,
+        clearcoat: 1,
+        clearcoatRoughness: 0,
+      }),
     }),
-    // 18k rose gold: copper-warm, slightly more diffuse
-    'rose gold': new THREE.MeshPhysicalMaterial({
-      color: '#C07050', metalness: 1, roughness: 0.18,
-      clearcoat: 0.4, clearcoatRoughness: 0.12,
-      anisotropy: 0.4,
-      iridescence: 0.08, iridescenceIOR: 1.5,
-      envMapIntensity: 2.4,
-    }),
-    // 18k white gold: near-neutral, high specular
-    'white gold': new THREE.MeshPhysicalMaterial({
-      color: '#C8C8C4', metalness: 1, roughness: 0.06,
-      clearcoat: 1, clearcoatRoughness: 0.04,
-      anisotropy: 0.3,
-      envMapIntensity: 3,
-    }),
-    // Platinum: coldest white, near-mirror polish, high clearcoat
-    'platinum': new THREE.MeshPhysicalMaterial({
-      color: '#E2E1DE', metalness: 1, roughness: 0.03,
-      clearcoat: 1, clearcoatRoughness: 0.01,
-      anisotropy: 0.2,
-      envMapIntensity: 3.5,
-    }),
-  }), []);
-
-  const settingMaterial = metal === 'yellow gold' || metal === 'rose gold' ? materials['white gold'] : materials[metal];
-  const activeMetal = materials[metal];
-
-  // Gemstone props — physically accurate IOR + dispersion + iridescence for fire
-  const stoneProps = useMemo(() => ({
-    diamond: {
-      color: '#ffffff', transmission: 1, ior: 2.417, thickness: 1.8,
-      roughness: 0, dispersion: 1.8,
-      iridescence: 0.35, iridescenceIOR: 2.4,
-      iridescenceThicknessRange: [100, 400] as [number, number],
-    },
-    emerald: {
-      color: '#3CB371', transmission: 0.92, ior: 1.577, thickness: 2,
-      roughness: 0.02, dispersion: 0.8,
-      attenuationColor: new THREE.Color('#1a6b3c'), attenuationDistance: 0.6,
-    },
-    sapphire: {
-      color: '#1240AB', transmission: 0.9, ior: 1.762, thickness: 2,
-      roughness: 0.01, dispersion: 0.5,
-      attenuationColor: new THREE.Color('#0a1f6b'), attenuationDistance: 0.7,
-    },
-    ruby: {
-      color: '#C10230', transmission: 0.88, ior: 1.762, thickness: 2,
-      roughness: 0.01, dispersion: 0.5,
-      attenuationColor: new THREE.Color('#6b0010'), attenuationDistance: 0.7,
-    },
-  }), []);
-
-  const stoneMaterials = useMemo(() => ({
-    diamond: new THREE.MeshPhysicalMaterial({ ...stoneProps.diamond, envMapIntensity: 5, transparent: true, side: THREE.DoubleSide }),
-    emerald: new THREE.MeshPhysicalMaterial({ ...stoneProps.emerald, envMapIntensity: 4.5, transparent: true, side: THREE.DoubleSide }),
-    sapphire: new THREE.MeshPhysicalMaterial({ ...stoneProps.sapphire, envMapIntensity: 4.5, transparent: true, side: THREE.DoubleSide }),
-    ruby:    new THREE.MeshPhysicalMaterial({ ...stoneProps.ruby,    envMapIntensity: 4.5, transparent: true, side: THREE.DoubleSide }),
-  }), [stoneProps]);
+    [],
+  );
 
   useEffect(() => {
-    if (fbx.userData.initialized) return;
-    fbx.traverse((child: any) => {
-      if (!child.isMesh) return;
-      child.castShadow = false;
-      child.receiveShadow = false;
-      if (!child.userData.normalsComputed) {
-        child.geometry.computeVertexNormals();
-        child.userData.normalsComputed = true;
-      }
+    root.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      if (mesh.name.startsWith('stone_')) mesh.material = mats.stone;
+      else if (mesh.name === 'pave') mesh.material = mats.pave;
+      else mesh.material = mats.metal;
     });
-    const box = new THREE.Box3().setFromObject(fbx);
-    const center = box.getCenter(new THREE.Vector3());
-    fbx.position.sub(center);
-    fbx.scale.set(0.072, 0.072, 0.072);
-    fbx.userData.initialized = true;
-  }, [fbx]);
+  }, [root, mats]);
 
   useEffect(() => {
-    fbx.traverse((child: any) => {
-      if (!child.isMesh) return;
-      const matName = child.material?.name?.toLowerCase() || child.name?.toLowerCase() || '';
-      if (!child.userData.baseScale) child.userData.baseScale = child.scale.clone();
-      if (!child.userData.basePosition) child.userData.basePosition = child.position.clone();
-
-      child.scale.copy(child.userData.baseScale);
-      child.position.copy(child.userData.basePosition);
-
-      if (matName.includes('diamond') || matName.includes('gem') || matName.includes('stone')) {
-        child.material = stoneMaterials[stone];
-        if (shape === 'oval') child.scale.set(child.scale.x * 1.15, child.scale.y * 0.9, child.scale.z);
-        if (shape === 'emerald') child.scale.set(child.scale.x * 1.1, child.scale.y * 0.85, child.scale.z * 1.05);
-        if (settingStyle === 'bezel') child.position.y += 0.01;
-      } else if (matName.includes('setting') || matName.includes('prong')) {
-        child.material = settingMaterial;
-        if (settingStyle === 'bezel') child.scale.multiplyScalar(1.03);
-      } else {
-        child.material = activeMetal;
-        if (bandStyle === 'pave') child.scale.set(child.scale.x * 1.02, child.scale.y, child.scale.z * 1.02);
-      }
-      child.material.needsUpdate = true;
+    root.traverse((o) => {
+      if (!(o as THREE.Mesh).isMesh) return;
+      const n = o.name;
+      o.visible =
+        n === 'band' ||
+        n === 'head' ||
+        n === `stone_${config.cut}` ||
+        n === `${config.setting}_${config.cut}` ||
+        (n === 'pave' && config.band === 'pave');
     });
-  }, [fbx, activeMetal, settingMaterial, stoneMaterials, stone, shape, bandStyle, settingStyle]);
+  }, [root, config.cut, config.setting, config.band]);
 
-  useEffect(() => {
-    return () => {
-      Object.values(materials).forEach((m) => m.dispose());
-      Object.values(stoneMaterials).forEach((m) => m.dispose());
-    };
-  }, [materials, stoneMaterials]);
+  useEffect(() => () => Object.values(mats).forEach((m) => m.dispose()), [mats]);
 
-  useFrame(() => {
-    if (!group.current) return;
-    group.current.rotation.y += 0.0038;
+  const metalTarget = useMemo(() => new THREE.Color(), []);
+  const stoneTarget = useMemo(() => new THREE.Color(), []);
+  const attenTarget = useMemo(() => new THREE.Color(), []);
+
+  useFrame((state, dt) => {
+    const k = 1 - Math.exp(-dt * 7);
+    const m = METAL_LOOK[config.metal];
+    mats.metal.color.lerp(metalTarget.set(m.color), k);
+    mats.metal.roughness += (m.roughness - mats.metal.roughness) * k;
+
+    const s = STONE_LOOK[config.stone];
+    mats.stone.color.lerp(stoneTarget.set(s.color), k);
+    mats.stone.attenuationColor.lerp(attenTarget.set(s.attenuation), k);
+    mats.stone.attenuationDistance += (s.distance - mats.stone.attenuationDistance) * k;
+
+    if (sway.current) {
+      sway.current.rotation.y = -0.62 + Math.sin(state.clock.elapsedTime * 0.32) * 0.26;
+    }
   });
 
   return (
-    <Float speed={0.6} rotationIntensity={0.012} floatIntensity={0.012}>
-      <group ref={group} position={[0, 0, 0]}>
-        <primitive object={fbx} />
-        {engraving && (
-          <Text
-            position={[-0.2, 0.6, 0.9]}
-            fontSize={0.04}
-            color="#121212"
-            anchorX="center"
-            anchorY="middle"
-            font="https://fonts.gstatic.com/s/cardo/v19/wlp_gwjKBV1pqhv43IE.woff"
-          >
-            {engraving}
-          </Text>
-        )}
-      </group>
-    </Float>
+    <group ref={sway}>
+      <primitive object={root} />
+      {config.engraving && (
+        <Suspense fallback={null}>
+        <Text
+          font={FONT_URL}
+          position={[0, -(INNER_RADIUS - 0.0015), 0]}
+          rotation={[-Math.PI / 2, 0, 0]}
+          {...{ curveRadius: INNER_RADIUS - 0.0015 }}
+          fontSize={0.05}
+          letterSpacing={0.06}
+          color="#4a3512"
+          fillOpacity={0.8}
+          anchorX="center"
+          anchorY="middle"
+        >
+          {config.engraving}
+        </Text>
+        </Suspense>
+      )}
+    </group>
   );
 }
 
-export default function Configurator3D() {
-  const [activeTab, setActiveTab] = useState<(typeof tabs)[number]['id']>('metal');
-  const [view, setView] = useState<'hero' | 'top' | 'profile'>('hero');
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState('');
-  const [config, setConfig] = useState<RingConfig>({
-    metal: 'yellow gold',
-    stone: 'diamond',
-    shape: 'round',
-    bandStyle: 'plain',
-    settingStyle: 'solitaire',
-    engraving: ''
-  });
+useGLTF.preload(MODEL_URL);
 
-  const basePrice = 2500;
-  const estimatedPrice =
-    basePrice +
-    (config.metal === 'platinum' ? 800 : 0) +
-    (config.stone === 'diamond' ? 4500 : 1800) +
-    (config.bandStyle === 'pave' ? 400 : 0) +
-    (config.settingStyle === 'bezel' ? 150 : 0);
+/** Studio built from softboxes: dark surroundings + bright strips give polished metal its long reflections. */
+function Studio() {
+  const look = (self: THREE.Object3D) => self.lookAt(0, 0, 0);
+  return (
+    <Environment resolution={512} frames={1} background={false}>
+      {/* Mid-grey dome so shadowed reflections stay soft, like a grey photo studio */}
+      <mesh scale={40}>
+        <sphereGeometry args={[1, 32, 16]} />
+        <meshBasicMaterial color="#8a8a90" side={THREE.BackSide} toneMapped={false} />
+      </mesh>
+      <Lightformer form="rect" intensity={3.2} position={[0, 6, 0]} scale={[9, 9, 1]} onUpdate={look} />
+      <Lightformer form="rect" intensity={3.2} position={[-6.5, 1.2, 1.5]} scale={[1.3, 8, 1]} onUpdate={look} />
+      <Lightformer form="rect" intensity={3.2} position={[6.5, 0.6, 2.5]} scale={[1.3, 8, 1]} onUpdate={look} />
+      <Lightformer form="rect" intensity={1.3} position={[0, 0.8, 7]} scale={[7, 1.4, 1]} onUpdate={look} />
+      <Lightformer form="rect" intensity={1.6} position={[0, 2.5, -7]} scale={[8, 3, 1]} onUpdate={look} />
+      <Lightformer form="rect" intensity={1.4} color="#ffe9cf" position={[0, -6, 0]} scale={[9, 9, 1]} onUpdate={look} />
+    </Environment>
+  );
+}
+
+/* ── UI pieces ───────────────────────────────────────────────────────── */
+
+const CHAMFER = 12;
+const chamfer: CSSProperties = {
+  clipPath: `polygon(${CHAMFER}px 0, calc(100% - ${CHAMFER}px) 0, 100% ${CHAMFER}px, 100% calc(100% - ${CHAMFER}px), calc(100% - ${CHAMFER}px) 100%, ${CHAMFER}px 100%, 0 calc(100% - ${CHAMFER}px), 0 ${CHAMFER}px)`,
+};
+
+function Segmented<T extends string>({
+  name,
+  options,
+  value,
+  onChange,
+}: {
+  name: string;
+  options: ReadonlyArray<{ id: T; label: string }>;
+  value: T;
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label={name}
+      className="no-scrollbar flex max-w-full gap-1 overflow-x-auto"
+      style={chamfer}
+    >
+      {options.map((o) => {
+        const active = o.id === value;
+        return (
+          <button
+            key={o.id}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => onChange(o.id)}
+            className={cn(
+              'h-11 shrink-0 whitespace-nowrap px-4 text-[11px] font-medium uppercase tracking-[0.12em] text-black transition-colors md:h-12 md:px-7 md:text-[12px]',
+              active ? 'bg-white' : 'bg-[#f6f6f6] text-black/75 hover:bg-white/80',
+            )}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+const ghostButton =
+  'flex h-11 w-11 shrink-0 items-center justify-center text-black transition-opacity hover:opacity-60 disabled:pointer-events-none disabled:opacity-0 md:h-12 md:w-12';
+const darkButton =
+  'h-11 min-w-0 flex-1 bg-[#0e0e0e] px-8 text-[12px] font-medium uppercase tracking-[0.16em] text-white transition-colors hover:bg-black md:h-12 md:min-w-[12rem] md:flex-none';
+
+/* ── Screen ──────────────────────────────────────────────────────────── */
+
+export default function Configurator3D() {
+  const [config, setConfig] = useState<RingConfig>(DEFAULT_CONFIG);
+  const [step, setStep] = useState(0);
+  const [reviewing, setReviewing] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const savedTimer = useRef<number | undefined>(undefined);
+
+  useEffect(() => () => window.clearTimeout(savedTimer.current), []);
+
+  const update = <K extends keyof RingConfig>(key: K, value: RingConfig[K]) =>
+    setConfig((c) => ({ ...c, [key]: value }));
+
+  const price = estimatePrice(config);
+  const isLast = step === STEPS.length - 1;
+  const current = STEPS[step];
+
+  const next = () => (isLast ? setReviewing(true) : setStep((s) => s + 1));
+  const back = () => (reviewing ? setReviewing(false) : setStep((s) => Math.max(0, s - 1)));
 
   const saveToBrief = () => {
-    setIsSaving(true);
-    setSaveMessage('');
     window.localStorage.setItem(
       'vela-ring-brief',
-      JSON.stringify({ ...config, estimatedPrice, savedAt: new Date().toISOString() })
+      JSON.stringify({ ...config, estimatedPrice: price, savedAt: new Date().toISOString() }),
     );
-    setTimeout(() => {
-      setIsSaving(false);
-      setSaveMessage('Saved to your brief');
-      setTimeout(() => setSaveMessage(''), 1800);
-    }, 450);
+    setSaved(true);
+    window.clearTimeout(savedTimer.current);
+    savedTimer.current = window.setTimeout(() => setSaved(false), 2200);
   };
 
-  const stepIndex = tabs.findIndex((t) => t.id === activeTab);
-
-  const handleNext = () => {
-    if (stepIndex < tabs.length - 1) {
-      setActiveTab(tabs[stepIndex + 1].id);
-    } else {
-      saveToBrief();
-    }
-  };
-
-  const handleBack = () => {
-    if (stepIndex > 0) setActiveTab(tabs[stepIndex - 1].id);
-  };
-
-  const stepTitle =
-    activeTab === 'metal'
-      ? 'Select your metal'
-      : activeTab === 'band'
-        ? 'Band style'
-        : activeTab === 'setting'
-          ? 'Setting style'
-          : activeTab === 'stone'
-            ? 'Center stone & cut'
-            : 'Engraving';
-
-  const viewPresets = [
-    { id: 'hero' as const, label: 'Studio' },
-    { id: 'top' as const, label: 'From above' },
-    { id: 'profile' as const, label: 'Profile' },
+  const summary = [
+    label(OPTIONS.cut, config.cut) + ' · ' + label(OPTIONS.setting, config.setting),
+    label(OPTIONS.metal, config.metal),
+    label(OPTIONS.stone, config.stone),
+    label(OPTIONS.band, config.band),
+    ...(config.engraving ? [`“${config.engraving}”`] : []),
   ];
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden lux-bg lux-text">
-      {/* ── Studio header: hierarchy + estimate ── */}
-      <header className="shrink-0 border-b border-[var(--lux-border)] px-5 pb-5 pt-[max(0.5rem,env(safe-area-inset-top))]">
-        <Link
-          to="/"
-          className="lux-ui mb-4 inline-flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-[#707070] transition-colors hover:text-[#121212]"
+    <div className="fixed inset-0 z-[70] flex flex-col overflow-hidden text-[#111]" style={{ background: STAGE }}>
+      {/* Header */}
+      <header className="pointer-events-none absolute inset-x-0 top-0 z-10 grid grid-cols-[1fr_auto_1fr] items-center gap-y-3 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] md:px-8 md:pt-6">
+        <nav
+          aria-label="Steps"
+          className="pointer-events-auto no-scrollbar col-span-3 col-start-1 row-start-2 flex justify-center gap-2 overflow-x-auto md:col-span-1 md:row-start-1 md:justify-start"
         >
-          <ChevronLeft size={16} strokeWidth={1.5} aria-hidden />
-          Atelier
-        </Link>
-
-        <div className="flex items-start justify-between gap-6">
-          <div className="min-w-0 flex-1">
-            <p className="lux-kicker">Vela bespoke studio</p>
-            <h1 className="lux-page-title mt-1">Ring 3D Studio</h1>
-            <p className="lux-ui mt-2 max-w-[17rem] text-xs font-normal leading-relaxed tracking-[0.02em] text-[#707070]">
-              Solitaire customization — drag to rotate, pinch to zoom.
-            </p>
-          </div>
-          <motion.div
-            key={estimatedPrice}
-            initial={{ opacity: 0.5 }}
-            animate={{ opacity: 1 }}
-            className="shrink-0 text-right"
-          >
-            <p className="lux-ui text-[9px] font-medium uppercase tracking-[0.2em] text-[#707070]">Estimate</p>
-            <p className="lux-display mt-1 text-xl font-normal tabular-nums tracking-tight text-[#121212]">
-              ${estimatedPrice.toLocaleString()}
-            </p>
-          </motion.div>
-        </div>
-
-        {/* Step progress + jump navigation */}
-        <div className="mt-6 space-y-3">
-          <div className="flex items-baseline justify-between gap-3">
-            <p className="lux-ui text-[10px] font-medium uppercase tracking-[0.2em] text-[#707070]">
-              Step {stepIndex + 1} of {tabs.length}
-            </p>
-            <p className="lux-display text-sm font-normal text-[#121212]">{tabs[stepIndex].label}</p>
-          </div>
-          <div className="h-1 w-full overflow-hidden rounded-full bg-[#e4e4e4]">
-            <div
-              className="h-full rounded-full bg-[#121212] transition-[width] duration-300 ease-out"
-              style={{ width: `${((stepIndex + 1) / tabs.length) * 100}%` }}
-              role="progressbar"
-              aria-valuenow={stepIndex + 1}
-              aria-valuemin={1}
-              aria-valuemax={tabs.length}
-            />
-          </div>
-          <nav className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 py-0.5" aria-label="Customization steps">
-            {tabs.map((tab) => (
+          {STEPS.map((s, i) => (
+            <div key={s.id} className="flex items-center gap-2">
+              {i > 0 && <span aria-hidden className="text-[10px] text-black/30">·</span>}
               <button
-                key={tab.id}
                 type="button"
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => {
+                  setReviewing(false);
+                  setStep(i);
+                }}
+                aria-current={!reviewing && i === step ? 'step' : undefined}
                 className={cn(
-                  'lux-ui min-h-10 shrink-0 rounded-full border px-4 text-[9px] font-medium uppercase tracking-[0.16em] transition-colors',
-                  activeTab === tab.id
-                    ? 'border-[#121212] bg-[#121212] text-[#f5f5f5]'
-                    : 'border-[var(--lux-border)] bg-white text-[#121212] hover:border-[#b0b0b0]',
+                  'whitespace-nowrap text-[10px] font-medium uppercase tracking-[0.14em] transition-colors md:text-[11px]',
+                  i <= step || reviewing ? 'text-black' : 'text-black/40 hover:text-black/70',
                 )}
               >
-                {tab.label}
+                {s.label}
               </button>
-            ))}
-          </nav>
-        </div>
+            </div>
+          ))}
+        </nav>
+
+        <Link
+          to="/"
+          aria-label="Vela, home"
+          className="pointer-events-auto col-start-2 row-start-1 text-center text-[30px] italic leading-none text-black md:text-[36px]"
+          style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+        >
+          Vela
+        </Link>
+
+        <Link
+          to="/"
+          className="pointer-events-auto col-start-3 row-start-1 justify-self-end text-[10px] font-medium uppercase tracking-[0.14em] text-black transition-opacity hover:opacity-60 md:text-[11px]"
+        >
+          Close
+        </Link>
       </header>
 
-      {/* ── 3D viewport ── */}
-      <section className="relative min-h-[min(52vh,22rem)] flex-1 basis-0 bg-[radial-gradient(circle_at_50%_42%,#ffffff_0%,#f4f4f4_48%,#e6e6e6_100%)]">
+      {/* Stage */}
+      <div className="relative min-h-0 flex-1">
+        <div className="absolute inset-x-0 bottom-0 top-[5.25rem] md:top-14">
         <CanvasErrorBoundary>
           <Canvas
-            className="h-full w-full min-h-[240px] touch-none"
-            camera={{ position: VIEW_TARGETS.hero, fov: 48 }}
-            dpr={typeof window !== 'undefined' ? Math.min(window.devicePixelRatio, 2) : 1.5}
-            gl={{
-              antialias: true,
-              toneMapping: THREE.ACESFilmicToneMapping,
-              toneMappingExposure: 1.35,
-              powerPreference: 'high-performance',
-            }}
+            className="touch-none"
+            camera={{ fov: 26, near: 0.1, far: 50 }}
+            dpr={[1, 2]}
+            gl={{ antialias: true, toneMapping: THREE.NeutralToneMapping, toneMappingExposure: 1.05 }}
           >
-            <CameraRig view={view} />
-            <ambientLight intensity={1.05} />
-            <spotLight position={[8, 12, 10]} angle={0.32} penumbra={1} intensity={3} castShadow={false} />
-            <spotLight position={[-7, 9, -9]} angle={0.35} penumbra={1} intensity={1.45} />
-            <pointLight position={[0, 4, 1]} intensity={1.15} />
+            <color attach="background" args={[STAGE]} />
             <Suspense fallback={<Loading3D />}>
-              <RingModel {...config} />
-              <Environment preset="studio" />
-              <ContactShadows position={[0, -1.15, 0]} opacity={0.18} scale={6} blur={2.6} far={3.5} color="#8f8f8f" />
+              <Studio />
+              <Ring config={config} />
+              <ContactShadows
+                position={[0, -0.742, 0]}
+                opacity={0.38}
+                scale={4.2}
+                blur={3.4}
+                far={1.4}
+                resolution={512}
+                color="#5a4632"
+              />
             </Suspense>
+            <FitCamera />
             <OrbitControls
               makeDefault
-              enableDamping
-              dampingFactor={0.08}
-              target={[0, 0, 0]}
               enablePan={false}
-              minPolarAngle={Math.PI / 5.5}
-              maxPolarAngle={Math.PI / 1.48}
-              minDistance={1.02}
-              maxDistance={3.15}
+              enableDamping
+              dampingFactor={0.07}
+              target={TARGET.toArray()}
+              minPolarAngle={Math.PI * 0.18}
+              maxPolarAngle={Math.PI * 0.62}
             />
           </Canvas>
         </CanvasErrorBoundary>
-
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#f0f0f0]/90 to-transparent" aria-hidden />
-
-        <div className="absolute bottom-4 left-1/2 z-10 w-[min(calc(100%-2rem),20rem)] -translate-x-1/2 px-2">
-          <p className="lux-ui mb-2 text-center text-[9px] font-medium uppercase tracking-[0.2em] text-[#707070]">
-            View
-          </p>
-          <div
-            className="flex gap-1 rounded-full border border-[rgba(0,0,0,0.1)] bg-white/90 p-1 shadow-[var(--lux-shadow-soft)] backdrop-blur-md"
-            role="group"
-            aria-label="Camera angle"
-          >
-            {viewPresets.map((v) => (
-              <button
-                key={v.id}
-                type="button"
-                onClick={() => setView(v.id)}
-                className={cn(
-                  'lux-ui min-h-10 flex-1 rounded-full px-2 text-[9px] font-medium uppercase tracking-[0.12em] transition-colors',
-                  view === v.id ? 'bg-[#121212] text-white' : 'text-[#121212] hover:bg-[#f0f0f0]',
-                )}
-              >
-                {v.label}
-              </button>
-            ))}
-          </div>
         </div>
-      </section>
+      </div>
 
-      {/* ── Options sheet ── */}
-      <div className="shrink-0 border-t border-[var(--lux-border)] bg-[var(--lux-bg)] px-5 pb-[calc(5.75rem+env(safe-area-inset-bottom,0px))] pt-6">
-        <div className="mb-5">
-          <p className="lux-kicker">Current step</p>
-          <h2 className="lux-display mt-1 text-lg font-normal text-[#121212]">{stepTitle}</h2>
-        </div>
-
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-            className="mb-6"
-          >
-            {activeTab === 'metal' && (
-              <div className="no-scrollbar flex flex-wrap gap-3">
-                {[
-                  { id: 'yellow gold', label: 'Yellow gold' },
-                  { id: 'white gold', label: 'White gold' },
-                  { id: 'rose gold', label: 'Rose gold' },
-                  { id: 'platinum', label: 'Platinum' },
-                ].map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => setConfig({ ...config, metal: m.id as RingConfig['metal'] })}
-                    className={cn(
-                      'lux-chip',
-                      config.metal === m.id ? 'lux-chip-active' : 'lux-chip-inactive',
-                    )}
+      {/* Controls */}
+      <div className="shrink-0 px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2 text-center md:px-8 md:pb-8">
+        <AnimatePresence mode="wait" initial={false}>
+          {reviewing ? (
+            <motion.div
+              key="review"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.25 }}
+            >
+              <h2 className="text-[22px] leading-tight text-black md:text-[26px]" style={SERIF}>
+                Your creation
+              </h2>
+              <ul className="mx-auto mt-4 flex max-w-3xl flex-wrap justify-center gap-1" style={chamfer}>
+                {summary.map((line) => (
+                  <li
+                    key={line}
+                    className="bg-white px-4 py-3 text-[11px] font-medium uppercase tracking-[0.12em] md:px-6 md:text-[12px]"
                   >
-                    {m.label}
-                  </button>
+                    {line}
+                  </li>
                 ))}
+              </ul>
+              <div className="mx-auto mt-5 flex max-w-xl items-center justify-center gap-3">
+                <button type="button" onClick={back} className={ghostButton} aria-label="Back to editing">
+                  <ChevronLeft size={20} strokeWidth={1.5} />
+                </button>
+                <button type="button" onClick={saveToBrief} className={darkButton}>
+                  {saved ? 'Saved to your brief' : 'Save to brief'}
+                </button>
               </div>
-            )}
+            </motion.div>
+          ) : (
+            <motion.div
+              key={current.id}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.22 }}
+            >
+              <h2 className="text-[22px] leading-tight text-black md:text-[26px]" style={SERIF}>
+                {current.prompt}
+              </h2>
 
-            {activeTab === 'band' && (
-              <div className="no-scrollbar flex flex-wrap gap-3">
-                {[
-                  { id: 'plain', label: 'Plain', note: 'Included' },
-                  { id: 'pave', label: 'Pavé', note: '+$400' },
-                ].map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => setConfig({ ...config, bandStyle: m.id as RingConfig['bandStyle'] })}
-                    className={cn(
-                      'lux-chip gap-2',
-                      config.bandStyle === m.id ? 'lux-chip-active' : 'lux-chip-inactive',
-                    )}
-                  >
-                    <span>{m.label}</span>
-                    <span className="text-[9px] font-normal opacity-60">{m.note}</span>
+              <div className="mx-auto mt-4 flex max-w-3xl flex-col items-center gap-3 md:mt-5 md:flex-row md:justify-center md:gap-6">
+                <div className="hidden md:block">
+                  <button type="button" onClick={back} disabled={step === 0} className={ghostButton} aria-label="Previous step">
+                    <ChevronLeft size={20} strokeWidth={1.5} />
                   </button>
-                ))}
-              </div>
-            )}
-
-            {activeTab === 'setting' && (
-              <div className="no-scrollbar flex flex-wrap gap-3">
-                {[
-                  { id: 'solitaire', label: 'Solitaire', note: 'Included' },
-                  { id: 'bezel', label: 'Bezel', note: '+$150' },
-                ].map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => setConfig({ ...config, settingStyle: m.id as RingConfig['settingStyle'] })}
-                    className={cn(
-                      'lux-chip gap-2',
-                      config.settingStyle === m.id ? 'lux-chip-active' : 'lux-chip-inactive',
-                    )}
-                  >
-                    <span>{m.label}</span>
-                    <span className="text-[9px] font-normal opacity-60">{m.note}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {activeTab === 'stone' && (
-              <div className="space-y-5">
-                <div>
-                  <p className="lux-kicker mb-3">Gemstone</p>
-                  <div className="no-scrollbar flex flex-wrap gap-3">
-                    {[
-                      { id: 'diamond', label: 'Diamond', color: 'bg-gradient-to-br from-white to-gray-200' },
-                      { id: 'emerald', label: 'Emerald', color: 'bg-gradient-to-br from-[#50C878] to-[#043927]' },
-                      { id: 'sapphire', label: 'Sapphire', color: 'bg-gradient-to-br from-[#0F52BA] to-[#000080]' },
-                      { id: 'ruby', label: 'Ruby', color: 'bg-gradient-to-br from-[#E0115F] to-[#8B0000]' },
-                    ].map((s) => (
-                      <button
-                        key={s.id}
-                        type="button"
-                        onClick={() => setConfig({ ...config, stone: s.id as RingConfig['stone'] })}
-                        className={cn(
-                          'lux-chip gap-2.5',
-                          config.stone === s.id ? 'lux-chip-active' : 'lux-chip-inactive',
-                        )}
-                      >
-                        <span className={cn('h-4 w-4 shrink-0 rounded-full ring-1 ring-black/10', s.color)} />
-                        {s.label}
-                      </button>
-                    ))}
-                  </div>
                 </div>
-                <div>
-                  <p className="lux-kicker mb-3">Cut</p>
-                  <div className="no-scrollbar flex flex-wrap gap-3">
-                    {(['round', 'emerald', 'oval'] as const).map((shape) => (
-                      <button
-                        key={shape}
-                        type="button"
-                        onClick={() => setConfig({ ...config, shape })}
-                        className={cn(
-                          'lux-chip capitalize',
-                          config.shape === shape ? 'lux-chip-active' : 'lux-chip-inactive',
-                        )}
-                      >
-                        {shape}
-                      </button>
-                    ))}
-                  </div>
+
+                <div className="flex min-w-0 max-w-full flex-col items-center gap-1">
+                  {current.id === 'style' && (
+                    <>
+                      <Segmented name="Cut" options={OPTIONS.cut} value={config.cut} onChange={(v) => update('cut', v)} />
+                      <Segmented name="Setting" options={OPTIONS.setting} value={config.setting} onChange={(v) => update('setting', v)} />
+                    </>
+                  )}
+                  {current.id === 'metal' && (
+                    <Segmented name="Metal" options={OPTIONS.metal} value={config.metal} onChange={(v) => update('metal', v)} />
+                  )}
+                  {current.id === 'stone' && (
+                    <Segmented name="Stone" options={OPTIONS.stone} value={config.stone} onChange={(v) => update('stone', v)} />
+                  )}
+                  {current.id === 'diamonds' && (
+                    <Segmented name="Diamonds" options={OPTIONS.band} value={config.band} onChange={(v) => update('band', v)} />
+                  )}
+                  {current.id === 'engraving' && (
+                    <div className="relative w-full" style={chamfer}>
+                      <label htmlFor="engraving" className="sr-only">
+                        Engraving text
+                      </label>
+                      <input
+                        id="engraving"
+                        type="text"
+                        maxLength={20}
+                        value={config.engraving}
+                        onChange={(e) => update('engraving', e.target.value)}
+                        placeholder="Forever yours"
+                        className="h-11 w-full min-w-0 bg-white px-6 text-center text-[17px] text-black placeholder:text-black/35 focus:outline-none md:h-12 md:w-[22rem]"
+                        style={SERIF}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex w-full items-center gap-3 md:w-auto">
+                  {step > 0 && (
+                    <button type="button" onClick={back} className={cn(ghostButton, 'md:hidden')} aria-label="Previous step">
+                      <ChevronLeft size={20} strokeWidth={1.5} />
+                    </button>
+                  )}
+                  <button type="button" onClick={next} className={darkButton}>
+                    {isLast ? 'Done' : 'Next'}
+                  </button>
                 </div>
               </div>
-            )}
-
-            {activeTab === 'engrave' && (
-              <div>
-                <label htmlFor="engrave-input" className="sr-only">
-                  Engraving text
-                </label>
-                <input
-                  id="engrave-input"
-                  type="text"
-                  maxLength={20}
-                  value={config.engraving}
-                  onChange={(e) => setConfig({ ...config, engraving: e.target.value })}
-                  placeholder="Forever yours"
-                  className="h-12 w-full rounded-2xl border border-[var(--lux-border)] bg-white px-4 lux-ui text-sm tracking-[0.02em] text-[#121212] placeholder:text-[#a8a8a8] focus:border-[#121212] focus:outline-none focus:ring-2 focus:ring-[#121212]/15 transition-colors"
-                />
-                <p className="lux-ui mt-2 text-right text-[10px] tabular-nums text-[#707070]">
-                  {config.engraving.length} / 20
-                </p>
-              </div>
-            )}
-          </motion.div>
+            </motion.div>
+          )}
         </AnimatePresence>
 
-        <div className="flex gap-3">
-          {stepIndex > 0 ? (
-            <button
-              type="button"
-              onClick={handleBack}
-              className="lux-ui flex min-h-12 min-w-[5.5rem] shrink-0 items-center justify-center rounded-full border border-[var(--lux-border)] bg-white text-[10px] font-medium uppercase tracking-[0.18em] text-[#121212] transition-colors hover:border-[#121212]"
-            >
-              Back
-            </button>
-          ) : null}
-          <button
-            type="button"
-            onClick={handleNext}
-            disabled={isSaving}
-            className={cn(
-              'flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#121212] text-[#f5f5f5] lux-ui text-[10px] font-medium uppercase tracking-[0.2em] transition-opacity disabled:opacity-55',
-              stepIndex > 0 ? 'min-w-0 flex-1' : 'w-full',
-            )}
-          >
-            {isSaving ? (
-              'Saving…'
-            ) : stepIndex < tabs.length - 1 ? (
-              <>
-                <span>Continue</span>
-                <ChevronRight size={16} strokeWidth={1.5} aria-hidden />
-              </>
-            ) : (
-              <>
-                <span>{saveMessage || 'Save to brief'}</span>
-                <ChevronRight size={16} strokeWidth={1.5} aria-hidden />
-              </>
-            )}
-          </button>
-        </div>
+        <p className="mt-4 text-[15px] text-black/60 md:mt-5" style={SERIF}>
+          Your current selection: <span className="tabular-nums text-black/80">${price.toLocaleString()}</span>
+        </p>
       </div>
     </div>
   );
