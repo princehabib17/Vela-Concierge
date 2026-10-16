@@ -147,7 +147,7 @@ function FitCamera() {
   useEffect(() => {
     const t = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
     const aspect = width / height;
-    const dist = Math.max(1.02 / t, 0.92 / (t * aspect)) * 1.12;
+    const dist = Math.max(1.02 / t, 0.92 / (t * aspect)) * 1.2;
     camera.position.copy(new THREE.Vector3(0.18, 0.3, 1).normalize().multiplyScalar(dist).add(TARGET));
     camera.lookAt(TARGET);
     camera.updateProjectionMatrix();
@@ -418,11 +418,15 @@ export default function Configurator3D() {
 
         <Link
           to="/"
-          aria-label="Vela, home"
-          className="pointer-events-auto col-start-2 row-start-1 text-center text-[30px] italic leading-none text-black md:text-[36px]"
-          style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+          aria-label="Vela Jewellers, home"
+          className="pointer-events-auto col-start-2 row-start-1 justify-self-center"
         >
-          Vela
+          <img
+            src="/brand/vela-logo.png"
+            alt="Vela Jewellers"
+            className="h-10 w-auto mix-blend-multiply md:h-12"
+            draggable={false}
+          />
         </Link>
 
         <Link

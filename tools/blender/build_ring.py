@@ -25,11 +25,12 @@ import bmesh
 
 # ── Dimensions (scene units; ring outer diameter is ~1.5) ──────────────────
 R_IN = 0.62
-THICK = 0.11
-WIDTH = 0.20
+THICK = 0.115        # shank thickness at the shoulders (near the stone)
+THIN = 0.062         # shank thickness at the bottom
+WIDTH = 0.19         # shank width at the shoulders
+W_THIN = 0.105       # shank width at the bottom
 R_TOP = R_IN + THICK + 0.012  # crown of the domed outer surface
-S = 0.21  # centre stone half-size
-PAVE_S = 0.034
+S = 0.255  # centre stone half-size (~45% of the finger opening, like the reference)
 
 CUT_DEPTH = {'round': 0.72 * S, 'oval': 0.72 * S, 'emerald': 1.05 * S}
 
@@ -148,33 +149,54 @@ def make_materials():
 
 
 # ── Parts ───────────────────────────────────────────────────────────────────
+def _smooth(a, b, x):
+    u = min(1.0, max(0.0, (x - a) / (b - a)))
+    return u * u * (3 - 2 * u)
+
+
+def shoulder(theta):
+    """1 near the stone, 0 along the bottom of the shank (theta = angle from top)."""
+    return 1.0 - _smooth(math.radians(28), math.radians(125), abs(theta))
+
+
+def thick_at(theta):
+    return THIN + (THICK - THIN) * shoulder(theta)
+
+
+def width_at(theta):
+    return W_THIN + (WIDTH - W_THIN) * shoulder(theta)
+
+
+def outer_r(theta):
+    """Radius of the crown of the outer surface at theta."""
+    return R_IN + thick_at(theta) + 0.012 * thick_at(theta) / THICK
+
+
 def band_profile():
-    hw = WIDTH / 2
-    rad = 0.032
-    corners = [
-        (R_IN + THICK - rad, hw - rad, 0), (R_IN + rad, hw - rad, 90),
-        (R_IN + rad, -hw + rad, 180), (R_IN + THICK - rad, -hw + rad, 270),
-    ]
+    """Normalised rounded-rectangle section: (t across thickness 0..1, v across width -1..1)."""
+    rad_t, rad_v = 0.28, 0.20
+    corners = [(1 - rad_t, 1 - rad_v, 0), (rad_t, 1 - rad_v, 90),
+               (rad_t, -1 + rad_v, 180), (1 - rad_t, -1 + rad_v, 270)]
     pts = []
-    for cx, cy, a0 in corners:
+    for ct, cv, a0 in corners:
         for k in range(6):
             a = math.radians(a0 + 90 * k / 5)
-            pts.append((cx + rad * math.cos(a), cy + rad * math.sin(a)))
-    mid = R_IN + THICK / 2
-    out = []
-    for r, y in pts:  # domed outside, comfort-fit inside
-        dome = 1 - (y / hw) ** 2
-        out.append((r + (0.012 if r > mid else 0.008) * dome, y))
-    return out
+            pts.append((ct + rad_t * math.cos(a), cv + rad_v * math.sin(a)))
+    return pts
 
 
-def revolve(profile, steps=192):
+def revolve(profile, steps=240):
     n = len(profile)
     verts, faces = [], []
     for s in range(steps):
         a = 2 * math.pi * s / steps
+        th = a if a <= math.pi else a - 2 * math.pi
+        thick, hw = thick_at(th), width_at(th) / 2
         sn, cs = math.sin(a), math.cos(a)
-        verts += [(r * sn, y, r * cs) for r, y in profile]
+        for t, v in profile:
+            dome = 1 - v * v
+            r = R_IN + t * thick + (0.012 if t > 0.5 else 0.008) * dome * (thick / THICK)
+            verts.append((r * sn, v * hw, r * cs))
     for s in range(steps):
         s2 = (s + 1) % steps
         for i in range(n):
@@ -217,11 +239,11 @@ def prong(cut, px, py):
     g = zg(cut)
     z0 = R_TOP + 0.01
     path = [
-        (0.35, z0, 0.030), (0.75, 0.5 * (z0 + g - 0.07), 0.027),
-        (1.06, g - 0.07, 0.025), (1.03, g - 0.005, 0.024), (0.93, g + 0.030, 0.021),
+        (0.35, z0, 0.028), (0.75, 0.5 * (z0 + g - 0.07), 0.024),
+        (1.06, g - 0.07, 0.021), (1.03, g - 0.005, 0.020), (0.93, g + 0.034, 0.022),
     ]
     loops = [ring_loop(8, rad, z, 0, ox=px * k, oy=py * k) for k, z, rad in path]
-    return loft(loops, cap_first=True, apex=(px * 0.88, py * 0.88, g + 0.050))
+    return loft(loops, cap_first=True, apex=(px * 0.90, py * 0.90, g + 0.060))
 
 
 def prongs(cut):
@@ -251,20 +273,23 @@ def bezel(cut):
 
 
 def pave():
+    """One row of graduated stones down each shoulder, set flush into the shank."""
     parts = []
-    base_v, base_f = stone('round', PAVE_S, n_round=8)
     for side in (-1, 1):
-        for row in (-1, 1):
-            for i in range(12):
-                th = math.radians(18 + i * 6.4) * side
-                st, ct = math.sin(th), math.cos(th)
-                tangent, radial = (ct, 0, -st), (st, 0, ct)
-                cr = R_TOP - 0.010 - 0.002  # girdle just under the surface
-                cx, cy, cz = radial[0] * cr, row * 0.048, radial[2] * cr
-                moved = [(tangent[0] * x + radial[0] * z + cx,
-                          y + cy,
-                          tangent[2] * x + radial[2] * z + cz) for x, y, z in base_v]
-                parts.append((moved, base_f))
+        th = math.radians(16.0)
+        while th < math.radians(112):
+            f = shoulder(th)
+            s = 0.019 + 0.017 * f  # graduate from ~0.036 down to ~0.019
+            sv, sf = stone('round', s, n_round=8)
+            ang = th * side
+            st, ct = math.sin(ang), math.cos(ang)
+            tangent, radial = (ct, 0, -st), (st, 0, ct)
+            cr = outer_r(th) - 0.10 * s
+            cx, cz = radial[0] * cr, radial[2] * cr
+            moved = [(tangent[0] * x + radial[0] * z + cx, y,
+                      tangent[2] * x + radial[2] * z + cz) for x, y, z in sv]
+            parts.append((moved, sf))
+            th += (2.2 * s) / outer_r(th)
     return merge(parts)
 
 
