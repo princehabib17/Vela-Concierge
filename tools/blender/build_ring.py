@@ -7,12 +7,12 @@ Run headless (bpy module or Blender binary):
 Every option the configurator offers is real, separately named geometry, so the
 web app only toggles visibility and swaps materials by node name:
 
-    band                          always visible
-    head                          neck joining band to stone, always visible
-    stone_round | stone_oval | stone_emerald   centre stone (one visible)
-    prongs_<cut>                  four-claw setting for that cut
-    bezel_<cut>                   closed bezel setting for that cut
-    pave                          two rows of small diamonds on the shoulders
+    band, head                    always visible
+    stone_<cut>                   centre stone (round, oval, emerald, pear)
+    prongs_<cut>                  claw setting for that cut
+    bezel_<cut>                   closed bezel setting
+    gallery_<cut> + halo_<cut>    hidden halo setting (claws + collar + tiny diamonds)
+    pave | eternity               graduated diamonds on the shoulders / all the way round
 
 Axes (Blender, Z up): ring axis = Y, stone on +Z. glTF export converts to Y up.
 Material slot names: METAL, STONE (centre stone), DIAMOND (pave).
@@ -32,7 +32,8 @@ W_THIN = 0.105       # shank width at the bottom
 R_TOP = R_IN + THICK + 0.012  # crown of the domed outer surface
 S = 0.255  # centre stone half-size (~45% of the finger opening, like the reference)
 
-CUT_DEPTH = {'round': 0.72 * S, 'oval': 0.72 * S, 'emerald': 1.05 * S}
+CUTS = ('round', 'oval', 'emerald', 'pear')
+CUT_DEPTH = {'round': 0.72 * S, 'oval': 0.72 * S, 'pear': 0.72 * S, 'emerald': 1.05 * S}
 
 
 def zg(cut):
@@ -47,6 +48,23 @@ def ring_loop(n, r, z, tw=0.0, sx=1.0, sy=1.0, ox=0.0, oy=0.0):
         a = (i + tw) * 2 * math.pi / n
         out.append((ox + r * sx * math.cos(a), oy + r * sy * math.sin(a), z))
     return out
+
+
+def shape_loop(cut, n, k, z, tw=0.0):
+    """Outline of a round / oval / pear stone at scale k (unit = stone half-size S)."""
+    pts = []
+    for i in range(n):
+        a = (i + tw) * 2 * math.pi / n
+        c, s_ = math.cos(a), math.sin(a)
+        if cut == 'round':
+            x, y = c, s_
+        elif cut == 'oval':
+            x, y = 0.88 * c, 1.22 * s_
+        else:  # pear: full belly, tapering to a point at +y
+            up = max(0.0, s_)
+            x, y = 0.95 * c * (1 - 0.55 * up * up), (1.30 * s_ if s_ > 0 else 0.95 * s_)
+        pts.append((x * k * S, y * k * S, z))
+    return pts
 
 
 def rect_loop(a, b, c, z):
@@ -208,12 +226,14 @@ def revolve(profile, steps=240):
 def stone(cut, scale=S, n_round=16):
     """Centre stone with its girdle at z=0; caller translates it."""
     s = scale
-    if cut in ('round', 'oval'):
-        sx, sy = (1.0, 1.0) if cut == 'round' else (0.88, 1.22)
+    if cut != 'emerald':
         spec = [(0.56, 0.22, 0.0), (0.80, 0.13, 0.5), (1.0, 0.02, 0.0),
                 (1.0, -0.02, 0.0), (0.60, -0.42, 0.5)]
-        loops = [ring_loop(n_round, r * s, z * s, tw, sx, sy) for r, z, tw in spec]
-        return loft(loops, [t for _, _, t in spec], cap_first=True,
+        loops = []
+        for r, z, tw in spec:
+            pts = shape_loop(cut, n_round, r, z * S, tw)
+            loops.append([(x * s / S, y * s / S, zz * s / S) for x, y, zz in pts])
+        return loft(loops, [t_ for _, _, t_ in spec], cap_first=True,
                     apex=(0, 0, -0.72 * s))
     a, b, c = 0.74, 1.02, 0.26
     spec = [(0.60, 0.23), (0.74, 0.17), (0.88, 0.10), (1.0, 0.02), (1.0, -0.02),
@@ -227,6 +247,8 @@ def footprints(cut):
     if cut == 'round':
         p = 0.707 * S * 1.0
         return [(sx * p, sy * p) for sx in (-1, 1) for sy in (-1, 1)]
+    if cut == 'pear':
+        return [(-0.78 * S, -0.50 * S), (0.78 * S, -0.50 * S), (0.0, 1.18 * S)]
     if cut == 'oval':
         px, py = 0.707 * 0.88 * S, 0.707 * 1.22 * S
         return [(sx * px, sy * py) for sx in (-1, 1) for sy in (-1, 1)]
@@ -260,10 +282,8 @@ def bezel(cut):
     s = S
 
     def shape(k, z):
-        if cut == 'round':
-            return ring_loop(16, k * s, z)
-        if cut == 'oval':
-            return ring_loop(16, k * s, z, sx=0.88, sy=1.22)
+        if cut != 'emerald':
+            return shape_loop(cut, 16, k, z)
         return rect_loop(0.74 * k * s, 1.02 * k * s, 0.26 * k * s, z)
 
     spec = [(0.90, g - 0.030), (0.99, g + 0.000), (0.86, g + 0.036),   # inner wall
@@ -272,12 +292,13 @@ def bezel(cut):
     return loft([shape(k, z) for k, z in spec], cap_first=True, cap_last=True)
 
 
-def pave():
-    """One row of graduated stones down each shoulder, set flush into the shank."""
+def pave(mode='pave'):
+    """Graduated stones down each shoulder ('pave') or all the way round ('eternity')."""
     parts = []
+    end = math.radians(112 if mode == 'pave' else 178)
     for side in (-1, 1):
         th = math.radians(16.0)
-        while th < math.radians(112):
+        while th < end:
             f = shoulder(th)
             s = 0.019 + 0.017 * f  # graduate from ~0.036 down to ~0.019
             sv, sf = stone('round', s, n_round=8)
@@ -293,19 +314,75 @@ def pave():
     return merge(parts)
 
 
+def _perimeter_points(cut, k, count):
+    """Evenly spaced points (x, y, nx, ny) around a stone outline."""
+    if cut == 'emerald':
+        a, b, c = 0.74 * k * S, 1.02 * k * S, 0.26 * k * S
+        poly = [(-a + c, -b), (a - c, -b), (a, -b + c), (a, b - c),
+                (a - c, b), (-a + c, b), (-a, b - c), (-a, -b + c)]
+    else:
+        poly = [(x, y) for x, y, _ in shape_loop(cut, 96, k, 0.0)]
+    n = len(poly)
+    seg = [math.dist(poly[i], poly[(i + 1) % n]) for i in range(n)]
+    total, out, acc, j = sum(seg), [], 0.0, 0
+    for m in range(count):
+        target = total * m / count
+        while acc + seg[j] < target:
+            acc += seg[j]
+            j = (j + 1) % n
+        u = (target - acc) / seg[j]
+        x = poly[j][0] + (poly[(j + 1) % n][0] - poly[j][0]) * u
+        y = poly[j][1] + (poly[(j + 1) % n][1] - poly[j][1]) * u
+        nx, ny = poly[(j + 1) % n][1] - poly[j][1], -(poly[(j + 1) % n][0] - poly[j][0])
+        ln = math.hypot(nx, ny) or 1.0
+        out.append((x, y, nx / ln, ny / ln))
+    return out
+
+
+def halo(cut):
+    """Hidden halo: a ring of tiny diamonds just under the girdle, facing outward."""
+    g = zg(cut)
+    s = 0.0155
+    count = max(24, int(2 * math.pi * S * 1.0 / (2.15 * s)))
+    sv, sf = stone('round', s, n_round=8)
+    parts = []
+    for x, y, nx, ny in _perimeter_points(cut, 1.0, count):
+        tx, ty = -ny, nx  # tangent in the xy plane
+        moved = [(tx * px + nx * pz + x, ty * px + ny * pz + y, py + g - 0.052)
+                 for px, py, pz in sv]
+        parts.append((moved, sf))
+    return merge(parts)
+
+
+def gallery(cut):
+    """Metal collar that carries the hidden halo."""
+    g = zg(cut)
+
+    def shape(k, z):
+        if cut == 'emerald':
+            return rect_loop(0.74 * k * S, 1.02 * k * S, 0.26 * k * S, z)
+        return shape_loop(cut, 16, k, z)
+
+    spec = [(0.80, g - 0.012), (0.985, g - 0.012), (0.985, g - 0.092), (0.80, g - 0.092)]
+    return loft([shape(k, z) for k, z in spec], cap_first=False, wrap=True)
+
+
 # ── Scene ───────────────────────────────────────────────────────────────────
 def build(collection):
     metal, glass, dia = make_materials()
     objs = {}
     objs['band'] = add_object('band', revolve(band_profile()), metal, collection, smooth=True)
     objs['head'] = add_object('head', head(), metal, collection, smooth=True)
-    for cut in ('round', 'oval', 'emerald'):
+    for cut in CUTS:
         sv, sf = stone(cut)
         objs[f'stone_{cut}'] = add_object(
             f'stone_{cut}', (translate(sv, dz=zg(cut)), sf), glass, collection)
         objs[f'prongs_{cut}'] = add_object(f'prongs_{cut}', prongs(cut), metal, collection, smooth=True)
         objs[f'bezel_{cut}'] = add_object(f'bezel_{cut}', bezel(cut), metal, collection, smooth=True)
-    objs['pave'] = add_object('pave', pave(), dia, collection)
+        objs[f'gallery_{cut}'] = add_object(f'gallery_{cut}', gallery(cut), metal, collection, smooth=True)
+        objs[f'halo_{cut}'] = add_object(f'halo_{cut}', halo(cut), dia, collection)
+    objs['pave'] = add_object('pave', pave('pave'), dia, collection)
+    objs['eternity'] = add_object('eternity', pave('eternity'), dia, collection)
     return objs
 
 
