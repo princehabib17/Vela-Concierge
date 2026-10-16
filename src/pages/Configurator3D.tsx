@@ -4,7 +4,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { ContactShadows, Environment, Html, Lightformer, OrbitControls, Text, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { AnimatePresence, motion } from 'motion/react';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /* ── Config ──────────────────────────────────────────────────────────── */
@@ -24,12 +24,12 @@ type RingConfig = {
   engraving: string;
 };
 
-const STEPS = [
-  { id: 'style', label: 'Style', prompt: 'Select your style' },
-  { id: 'metal', label: 'Metal', prompt: 'Select your metal' },
-  { id: 'stone', label: 'Stone', prompt: 'Select your stone' },
-  { id: 'diamonds', label: 'Diamonds', prompt: 'Select your diamonds' },
-  { id: 'engraving', label: 'Engraving', prompt: 'Add an engraving' },
+const TABS = [
+  { id: 'metal', label: 'Metal', title: 'Select your metal' },
+  { id: 'stone', label: 'Stone', title: 'Stone & cut' },
+  { id: 'setting', label: 'Setting', title: 'Setting style' },
+  { id: 'band', label: 'Band', title: 'Band style' },
+  { id: 'engrave', label: 'Engraving', title: 'Engraving' },
 ] as const;
 
 const OPTIONS = {
@@ -135,28 +135,66 @@ function Loading3D() {
   );
 }
 
-/** Frames the ring for any viewport: portrait phones pull back, wide screens move in. */
-function FitCamera() {
+type View = 'hero' | 'top' | 'profile';
+
+const VIEW_DIRS: Record<View, THREE.Vector3> = {
+  hero: new THREE.Vector3(0.18, 0.3, 1).normalize(),
+  top: new THREE.Vector3(0.05, 1.7, 0.55).normalize(),
+  profile: new THREE.Vector3(1, 0.1, 0.04).normalize(),
+};
+
+/** Frames the ring for any viewport (portrait phones pull back) and glides between view presets. */
+function CameraRig({ view }: { view: View }) {
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
   const controls = useThree((s) => s.controls) as unknown as
-    | { minDistance: number; maxDistance: number; update: () => void }
+    | { enabled: boolean; target: THREE.Vector3; minDistance: number; maxDistance: number; update: () => void }
     | null;
   const width = useThree((s) => s.size.width);
   const height = useThree((s) => s.size.height);
+  const dist = useRef(5);
+  const goal = useRef(new THREE.Vector3());
+  const moving = useRef(false);
+  const viewRef = useRef(view);
+  viewRef.current = view;
+
+  const aim = (v: View) => goal.current.copy(VIEW_DIRS[v]).multiplyScalar(dist.current).add(TARGET);
 
   useEffect(() => {
     const t = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
-    const aspect = width / height;
-    const dist = Math.max(1.02 / t, 0.92 / (t * aspect)) * 1.2;
-    camera.position.copy(new THREE.Vector3(0.18, 0.3, 1).normalize().multiplyScalar(dist).add(TARGET));
+    dist.current = Math.max(1.02 / t, 0.92 / (t * (width / height))) * 1.2;
+    aim(viewRef.current);
+    camera.position.copy(goal.current);
     camera.lookAt(TARGET);
     camera.updateProjectionMatrix();
     if (controls) {
-      controls.minDistance = dist * 0.55;
-      controls.maxDistance = dist * 1.35;
+      controls.minDistance = dist.current * 0.55;
+      controls.maxDistance = dist.current * 1.35;
       controls.update();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [camera, controls, width, height]);
+
+  useEffect(() => {
+    aim(view);
+    moving.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
+
+  useFrame((_, dt) => {
+    if (!moving.current) return;
+    if (controls) controls.enabled = false;
+    camera.position.lerp(goal.current, 1 - Math.exp(-dt * 6));
+    camera.lookAt(TARGET);
+    if (camera.position.distanceTo(goal.current) < 0.02) {
+      camera.position.copy(goal.current);
+      moving.current = false;
+      if (controls) {
+        controls.target.copy(TARGET);
+        controls.update();
+        controls.enabled = true;
+      }
+    }
+  });
 
   return null;
 }
@@ -296,150 +334,163 @@ function Studio() {
   );
 }
 
-/* ── UI pieces ───────────────────────────────────────────────────────── */
+/* ── Screen ──────────────────────────────────────────────────────────── */
 
-const CHAMFER = 12;
-const chamfer: CSSProperties = {
-  clipPath: `polygon(${CHAMFER}px 0, calc(100% - ${CHAMFER}px) 0, 100% ${CHAMFER}px, 100% calc(100% - ${CHAMFER}px), calc(100% - ${CHAMFER}px) 100%, ${CHAMFER}px 100%, 0 calc(100% - ${CHAMFER}px), 0 ${CHAMFER}px)`,
+const VIEW_PRESETS: Array<{ id: View; label: string }> = [
+  { id: 'hero', label: 'Studio' },
+  { id: 'top', label: 'From above' },
+  { id: 'profile', label: 'Profile' },
+];
+
+const GEM_SWATCH: Record<Stone, string> = {
+  diamond: 'bg-gradient-to-br from-white to-gray-200',
+  emerald: 'bg-gradient-to-br from-[#50C878] to-[#043927]',
+  sapphire: 'bg-gradient-to-br from-[#0F52BA] to-[#000080]',
+  ruby: 'bg-gradient-to-br from-[#E0115F] to-[#8B0000]',
 };
 
-function Segmented<T extends string>({
+const NOTES: Partial<Record<string, string>> = { bezel: '+$150', pave: '+$400', oval: '+$300', emerald: '+$600' };
+
+function Chips<T extends string>({
   name,
   options,
   value,
   onChange,
+  swatch,
 }: {
   name: string;
   options: ReadonlyArray<{ id: T; label: string }>;
   value: T;
   onChange: (v: T) => void;
+  swatch?: (id: T) => string;
 }) {
   return (
-    <div
-      role="radiogroup"
-      aria-label={name}
-      className="no-scrollbar flex max-w-full gap-1 overflow-x-auto"
-      style={chamfer}
-    >
-      {options.map((o) => {
-        const active = o.id === value;
-        return (
-          <button
-            key={o.id}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            onClick={() => onChange(o.id)}
-            className={cn(
-              'h-11 shrink-0 whitespace-nowrap px-4 text-[11px] font-medium uppercase tracking-[0.12em] text-black transition-colors md:h-12 md:px-7 md:text-[12px]',
-              active ? 'bg-white' : 'bg-[#f6f6f6] text-black/75 hover:bg-white/80',
-            )}
-          >
-            {o.label}
-          </button>
-        );
-      })}
+    <div role="radiogroup" aria-label={name} className="flex flex-wrap gap-3">
+      {options.map((o) => (
+        <button
+          key={o.id}
+          type="button"
+          role="radio"
+          aria-checked={o.id === value}
+          onClick={() => onChange(o.id)}
+          className={cn('lux-chip gap-2', o.id === value ? 'lux-chip-active' : 'lux-chip-inactive')}
+        >
+          {swatch && <span className={cn('h-4 w-4 shrink-0 rounded-full ring-1 ring-black/10', swatch(o.id))} />}
+          <span>{o.label}</span>
+          {NOTES[o.id] && <span className="text-[9px] font-normal opacity-60">{NOTES[o.id]}</span>}
+        </button>
+      ))}
     </div>
   );
 }
 
-const ghostButton =
-  'flex h-11 w-11 shrink-0 items-center justify-center text-black transition-opacity hover:opacity-60 disabled:pointer-events-none disabled:opacity-0 md:h-12 md:w-12';
-const darkButton =
-  'h-11 min-w-0 flex-1 bg-[#0e0e0e] px-8 text-[12px] font-medium uppercase tracking-[0.16em] text-white transition-colors hover:bg-black md:h-12 md:min-w-[12rem] md:flex-none';
-
-/* ── Screen ──────────────────────────────────────────────────────────── */
-
 export default function Configurator3D() {
   const [config, setConfig] = useState<RingConfig>(DEFAULT_CONFIG);
-  const [step, setStep] = useState(0);
-  const [reviewing, setReviewing] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const savedTimer = useRef<number | undefined>(undefined);
+  const [activeTab, setActiveTab] = useState<(typeof TABS)[number]['id']>('metal');
+  const [view, setView] = useState<View>('hero');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
+  const timers = useRef<number[]>([]);
 
-  useEffect(() => () => window.clearTimeout(savedTimer.current), []);
+  useEffect(() => () => timers.current.forEach((id) => window.clearTimeout(id)), []);
 
   const update = <K extends keyof RingConfig>(key: K, value: RingConfig[K]) =>
     setConfig((c) => ({ ...c, [key]: value }));
 
   const price = estimatePrice(config);
-  const isLast = step === STEPS.length - 1;
-  const current = STEPS[step];
-
-  const next = () => (isLast ? setReviewing(true) : setStep((s) => s + 1));
-  const back = () => (reviewing ? setReviewing(false) : setStep((s) => Math.max(0, s - 1)));
+  const stepIndex = TABS.findIndex((tab) => tab.id === activeTab);
+  const tab = TABS[stepIndex];
 
   const saveToBrief = () => {
+    setIsSaving(true);
+    setSaveMessage('');
     window.localStorage.setItem(
       'vela-ring-brief',
       JSON.stringify({ ...config, estimatedPrice: price, savedAt: new Date().toISOString() }),
     );
-    setSaved(true);
-    window.clearTimeout(savedTimer.current);
-    savedTimer.current = window.setTimeout(() => setSaved(false), 2200);
+    timers.current.push(
+      window.setTimeout(() => {
+        setIsSaving(false);
+        setSaveMessage('Saved to your brief');
+        timers.current.push(window.setTimeout(() => setSaveMessage(''), 1800));
+      }, 450),
+    );
   };
 
-  const summary = [
-    label(OPTIONS.cut, config.cut) + ' · ' + label(OPTIONS.setting, config.setting),
-    label(OPTIONS.metal, config.metal),
-    label(OPTIONS.stone, config.stone),
-    label(OPTIONS.band, config.band),
-    ...(config.engraving ? [`“${config.engraving}”`] : []),
-  ];
+  const handleNext = () => (stepIndex < TABS.length - 1 ? setActiveTab(TABS[stepIndex + 1].id) : saveToBrief());
+  const handleBack = () => stepIndex > 0 && setActiveTab(TABS[stepIndex - 1].id);
 
   return (
-    <div className="fixed inset-0 z-[70] flex flex-col overflow-hidden text-[#111]" style={{ background: STAGE }}>
-      {/* Header */}
-      <header className="pointer-events-none absolute inset-x-0 top-0 z-10 grid grid-cols-[1fr_auto_1fr] items-center gap-y-3 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] md:px-8 md:pt-6">
-        <nav
-          aria-label="Steps"
-          className="pointer-events-auto no-scrollbar col-span-3 col-start-1 row-start-2 flex justify-center gap-2 overflow-x-auto md:col-span-1 md:row-start-1 md:justify-start"
+    <div className="lux-bg lux-text flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
+      {/* Header: hierarchy + estimate */}
+      <header className="shrink-0 border-b border-[var(--lux-border)] px-5 pb-5 pt-[max(0.5rem,env(safe-area-inset-top))]">
+        <Link
+          to="/"
+          className="lux-ui mb-4 inline-flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-[#707070] transition-colors hover:text-[#121212]"
         >
-          {STEPS.map((s, i) => (
-            <div key={s.id} className="flex items-center gap-2">
-              {i > 0 && <span aria-hidden className="text-[10px] text-black/30">·</span>}
+          <ChevronLeft size={16} strokeWidth={1.5} aria-hidden />
+          Atelier
+        </Link>
+
+        <div className="flex items-start justify-between gap-6">
+          <div className="min-w-0 flex-1">
+            <p className="lux-kicker">Vela bespoke studio</p>
+            <h1 className="lux-page-title mt-1">Ring 3D Studio</h1>
+            <p className="lux-ui mt-2 max-w-[17rem] text-xs font-normal leading-relaxed tracking-[0.02em] text-[#707070]">
+              Solitaire customization — drag to rotate, pinch to zoom.
+            </p>
+          </div>
+          <motion.div key={price} initial={{ opacity: 0.5 }} animate={{ opacity: 1 }} className="shrink-0 text-right">
+            <p className="lux-ui text-[9px] font-medium uppercase tracking-[0.2em] text-[#707070]">Estimate</p>
+            <p className="lux-display mt-1 text-xl font-normal tabular-nums tracking-tight text-[#121212]">
+              ${price.toLocaleString()}
+            </p>
+          </motion.div>
+        </div>
+
+        <div className="mt-6 space-y-3">
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="lux-ui text-[10px] font-medium uppercase tracking-[0.2em] text-[#707070]">
+              Step {stepIndex + 1} of {TABS.length}
+            </p>
+            <p className="lux-display text-sm font-normal text-[#121212]">{tab.label}</p>
+          </div>
+          <div className="h-1 w-full overflow-hidden rounded-full bg-[#e4e4e4]">
+            <div
+              className="h-full rounded-full bg-[#121212] transition-[width] duration-300 ease-out"
+              style={{ width: `${((stepIndex + 1) / TABS.length) * 100}%` }}
+              role="progressbar"
+              aria-valuenow={stepIndex + 1}
+              aria-valuemin={1}
+              aria-valuemax={TABS.length}
+            />
+          </div>
+          <nav className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 py-0.5" aria-label="Customization steps">
+            {TABS.map((item) => (
               <button
+                key={item.id}
                 type="button"
-                onClick={() => {
-                  setReviewing(false);
-                  setStep(i);
-                }}
-                aria-current={!reviewing && i === step ? 'step' : undefined}
+                onClick={() => setActiveTab(item.id)}
                 className={cn(
-                  'whitespace-nowrap text-[10px] font-medium uppercase tracking-[0.14em] transition-colors md:text-[11px]',
-                  i <= step || reviewing ? 'text-black' : 'text-black/40 hover:text-black/70',
+                  'lux-ui min-h-10 shrink-0 rounded-full border px-4 text-[9px] font-medium uppercase tracking-[0.16em] transition-colors',
+                  activeTab === item.id
+                    ? 'border-[#121212] bg-[#121212] text-[#f5f5f5]'
+                    : 'border-[var(--lux-border)] bg-white text-[#121212] hover:border-[#b0b0b0]',
                 )}
               >
-                {s.label}
+                {item.label}
               </button>
-            </div>
-          ))}
-        </nav>
-
-        <Link
-          to="/"
-          aria-label="Vela Jewellers, home"
-          className="pointer-events-auto col-start-2 row-start-1 justify-self-center"
-        >
-          <img
-            src="/brand/vela-logo.png"
-            alt="Vela Jewellers"
-            className="h-10 w-auto mix-blend-multiply md:h-12"
-            draggable={false}
-          />
-        </Link>
-
-        <Link
-          to="/"
-          className="pointer-events-auto col-start-3 row-start-1 justify-self-end text-[10px] font-medium uppercase tracking-[0.14em] text-black transition-opacity hover:opacity-60 md:text-[11px]"
-        >
-          Close
-        </Link>
+            ))}
+          </nav>
+        </div>
       </header>
 
-      {/* Stage */}
-      <div className="relative min-h-0 flex-1">
-        <div className="absolute inset-x-0 bottom-0 top-[5.25rem] md:top-14">
+      {/* 3D viewport */}
+      <section
+        className="sticky top-0 z-10 h-[min(48vh,24rem)] shrink-0 border-b border-[var(--lux-border)]"
+        style={{ background: STAGE }}
+      >
+        <div className="absolute inset-x-0 top-0 bottom-[6.25rem]">
         <CanvasErrorBoundary>
           <Canvas
             className="touch-none"
@@ -461,126 +512,147 @@ export default function Configurator3D() {
                 color="#5a4632"
               />
             </Suspense>
-            <FitCamera />
+            <CameraRig view={view} />
             <OrbitControls
               makeDefault
               enablePan={false}
               enableDamping
               dampingFactor={0.07}
               target={TARGET.toArray()}
-              minPolarAngle={Math.PI * 0.18}
+              minPolarAngle={Math.PI * 0.1}
               maxPolarAngle={Math.PI * 0.62}
             />
           </Canvas>
         </CanvasErrorBoundary>
         </div>
-      </div>
 
-      {/* Controls */}
-      <div className="shrink-0 px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2 text-center md:px-8 md:pb-8">
-        <AnimatePresence mode="wait" initial={false}>
-          {reviewing ? (
-            <motion.div
-              key="review"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.25 }}
-            >
-              <h2 className="text-[22px] leading-tight text-black md:text-[26px]" style={SERIF}>
-                Your creation
-              </h2>
-              <ul className="mx-auto mt-4 flex max-w-3xl flex-wrap justify-center gap-1" style={chamfer}>
-                {summary.map((line) => (
-                  <li
-                    key={line}
-                    className="bg-white px-4 py-3 text-[11px] font-medium uppercase tracking-[0.12em] md:px-6 md:text-[12px]"
-                  >
-                    {line}
-                  </li>
-                ))}
-              </ul>
-              <div className="mx-auto mt-5 flex max-w-xl items-center justify-center gap-3">
-                <button type="button" onClick={back} className={ghostButton} aria-label="Back to editing">
-                  <ChevronLeft size={20} strokeWidth={1.5} />
-                </button>
-                <button type="button" onClick={saveToBrief} className={darkButton}>
-                  {saved ? 'Saved to your brief' : 'Save to brief'}
-                </button>
-              </div>
-            </motion.div>
-          ) : (
-            <motion.div
-              key={current.id}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.22 }}
-            >
-              <h2 className="text-[22px] leading-tight text-black md:text-[26px]" style={SERIF}>
-                {current.prompt}
-              </h2>
+        <div className="absolute bottom-4 left-1/2 z-10 w-[min(calc(100%-2rem),20rem)] -translate-x-1/2 px-2">
+          <p className="lux-ui mb-2 text-center text-[9px] font-medium uppercase tracking-[0.2em] text-[#707070]">View</p>
+          <div
+            className="flex gap-1 rounded-full border border-[rgba(0,0,0,0.1)] bg-white/90 p-1 shadow-[var(--lux-shadow-soft)] backdrop-blur-md"
+            role="group"
+            aria-label="Camera angle"
+          >
+            {VIEW_PRESETS.map((v) => (
+              <button
+                key={v.id}
+                type="button"
+                onClick={() => setView(v.id)}
+                className={cn(
+                  'lux-ui min-h-10 flex-1 rounded-full px-2 text-[9px] font-medium uppercase tracking-[0.12em] transition-colors',
+                  view === v.id ? 'bg-[#121212] text-white' : 'text-[#121212] hover:bg-[#f0f0f0]',
+                )}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
 
-              <div className="mx-auto mt-4 flex max-w-3xl flex-col items-center gap-3 md:mt-5 md:flex-row md:justify-center md:gap-6">
-                <div className="hidden md:block">
-                  <button type="button" onClick={back} disabled={step === 0} className={ghostButton} aria-label="Previous step">
-                    <ChevronLeft size={20} strokeWidth={1.5} />
-                  </button>
+      {/* Options sheet */}
+      <div className="shrink-0 border-t border-[var(--lux-border)] bg-[var(--lux-bg)] px-5 pb-[calc(5.75rem+env(safe-area-inset-bottom,0px))] pt-6">
+        <div className="mb-5">
+          <p className="lux-kicker">Current step</p>
+          <h2 className="lux-display mt-1 text-lg font-normal text-[#121212]">{tab.title}</h2>
+        </div>
+
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            className="mb-6"
+          >
+            {activeTab === 'metal' && (
+              <Chips name="Metal" options={OPTIONS.metal} value={config.metal} onChange={(v) => update('metal', v)} />
+            )}
+
+            {activeTab === 'stone' && (
+              <div className="space-y-5">
+                <div>
+                  <p className="lux-kicker mb-3">Gemstone</p>
+                  <Chips
+                    name="Gemstone"
+                    options={OPTIONS.stone}
+                    value={config.stone}
+                    onChange={(v) => update('stone', v)}
+                    swatch={(id) => GEM_SWATCH[id]}
+                  />
                 </div>
-
-                <div className="flex min-w-0 max-w-full flex-col items-center gap-1">
-                  {current.id === 'style' && (
-                    <>
-                      <Segmented name="Cut" options={OPTIONS.cut} value={config.cut} onChange={(v) => update('cut', v)} />
-                      <Segmented name="Setting" options={OPTIONS.setting} value={config.setting} onChange={(v) => update('setting', v)} />
-                    </>
-                  )}
-                  {current.id === 'metal' && (
-                    <Segmented name="Metal" options={OPTIONS.metal} value={config.metal} onChange={(v) => update('metal', v)} />
-                  )}
-                  {current.id === 'stone' && (
-                    <Segmented name="Stone" options={OPTIONS.stone} value={config.stone} onChange={(v) => update('stone', v)} />
-                  )}
-                  {current.id === 'diamonds' && (
-                    <Segmented name="Diamonds" options={OPTIONS.band} value={config.band} onChange={(v) => update('band', v)} />
-                  )}
-                  {current.id === 'engraving' && (
-                    <div className="relative w-full" style={chamfer}>
-                      <label htmlFor="engraving" className="sr-only">
-                        Engraving text
-                      </label>
-                      <input
-                        id="engraving"
-                        type="text"
-                        maxLength={20}
-                        value={config.engraving}
-                        onChange={(e) => update('engraving', e.target.value)}
-                        placeholder="Forever yours"
-                        className="h-11 w-full min-w-0 bg-white px-6 text-center text-[17px] text-black placeholder:text-black/35 focus:outline-none md:h-12 md:w-[22rem]"
-                        style={SERIF}
-                      />
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex w-full items-center gap-3 md:w-auto">
-                  {step > 0 && (
-                    <button type="button" onClick={back} className={cn(ghostButton, 'md:hidden')} aria-label="Previous step">
-                      <ChevronLeft size={20} strokeWidth={1.5} />
-                    </button>
-                  )}
-                  <button type="button" onClick={next} className={darkButton}>
-                    {isLast ? 'Done' : 'Next'}
-                  </button>
+                <div>
+                  <p className="lux-kicker mb-3">Cut</p>
+                  <Chips name="Cut" options={OPTIONS.cut} value={config.cut} onChange={(v) => update('cut', v)} />
                 </div>
               </div>
-            </motion.div>
-          )}
+            )}
+
+            {activeTab === 'setting' && (
+              <Chips name="Setting" options={OPTIONS.setting} value={config.setting} onChange={(v) => update('setting', v)} />
+            )}
+
+            {activeTab === 'band' && (
+              <Chips name="Band" options={OPTIONS.band} value={config.band} onChange={(v) => update('band', v)} />
+            )}
+
+            {activeTab === 'engrave' && (
+              <div>
+                <label htmlFor="engrave-input" className="sr-only">
+                  Engraving text
+                </label>
+                <input
+                  id="engrave-input"
+                  type="text"
+                  maxLength={20}
+                  value={config.engraving}
+                  onChange={(e) => update('engraving', e.target.value)}
+                  placeholder="Forever yours"
+                  className="lux-ui h-12 w-full rounded-2xl border border-[var(--lux-border)] bg-white px-4 text-sm tracking-[0.02em] text-[#121212] transition-colors placeholder:text-[#a8a8a8] focus:border-[#121212] focus:outline-none focus:ring-2 focus:ring-[#121212]/15"
+                />
+                <p className="lux-ui mt-2 text-right text-[10px] tabular-nums text-[#707070]">
+                  {config.engraving.length} / 20
+                </p>
+              </div>
+            )}
+          </motion.div>
         </AnimatePresence>
 
-        <p className="mt-4 text-[15px] text-black/60 md:mt-5" style={SERIF}>
-          Your current selection: <span className="tabular-nums text-black/80">${price.toLocaleString()}</span>
-        </p>
+        <div className="flex gap-3">
+          {stepIndex > 0 && (
+            <button
+              type="button"
+              onClick={handleBack}
+              className="lux-ui flex min-h-12 min-w-[5.5rem] shrink-0 items-center justify-center rounded-full border border-[var(--lux-border)] bg-white text-[10px] font-medium uppercase tracking-[0.18em] text-[#121212] transition-colors hover:border-[#121212]"
+            >
+              Back
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleNext}
+            disabled={isSaving}
+            className={cn(
+              'lux-ui flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#121212] text-[10px] font-medium uppercase tracking-[0.2em] text-[#f5f5f5] transition-opacity disabled:opacity-55',
+              stepIndex > 0 ? 'min-w-0 flex-1' : 'w-full',
+            )}
+          >
+            {isSaving ? (
+              'Saving…'
+            ) : stepIndex < TABS.length - 1 ? (
+              <>
+                <span>Continue</span>
+                <ChevronRight size={16} strokeWidth={1.5} aria-hidden />
+              </>
+            ) : (
+              <>
+                <span>{saveMessage || 'Save to brief'}</span>
+                <ChevronRight size={16} strokeWidth={1.5} aria-hidden />
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );
