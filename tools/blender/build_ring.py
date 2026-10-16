@@ -286,9 +286,12 @@ def bezel(cut):
             return shape_loop(cut, 16, k, z)
         return rect_loop(0.74 * k * s, 1.02 * k * s, 0.26 * k * s, z)
 
-    spec = [(0.90, g - 0.030), (0.99, g + 0.000), (0.86, g + 0.036),   # inner wall
-            (1.20, g + 0.036), (1.20, g - 0.030), (0.70, g - 0.100),   # outer wall
-            (0.30, R_TOP + 0.020)]
+    if cut == 'emerald':  # deep step-cut pavilion: the cup follows it all the way down
+        outer = [(1.20, g + 0.036), (1.20, g - 0.030), (1.02, g - 0.30 * S),
+                 (0.80, g - 0.58 * S), (0.58, g - 0.86 * S), (0.36, g - 1.05 * S), (0.30, R_TOP + 0.020)]
+    else:
+        outer = [(1.20, g + 0.036), (1.20, g - 0.030), (0.70, g - 0.100), (0.30, R_TOP + 0.020)]
+    spec = [(0.90, g - 0.030), (0.99, g + 0.000), (0.86, g + 0.036)] + outer  # inner wall, then outer wall
     return loft([shape(k, z) for k, z in spec], cap_first=True, cap_last=True)
 
 

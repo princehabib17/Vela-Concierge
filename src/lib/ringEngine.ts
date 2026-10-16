@@ -88,7 +88,12 @@ void main() {
   gl_FragColor = vec4(c.rgb * tint, c.a) * uOpacity;
 }`;
 
-type Tex = { tex: WebGLTexture };
+type Tex = { tex: WebGLTexture; used: number };
+
+/** Decoded frames kept on the GPU (~2.5 MB each); the rest are streamed in as the ring turns. */
+const MAX_TEXTURES = 72;
+const WINDOW_BEHIND = 3;
+const WINDOW_AHEAD = 5;
 type Scene = { geo: Geometry; layers: LayerRef[] };
 
 export class RingEngine {
@@ -110,6 +115,7 @@ export class RingEngine {
   private lastX = 0;
   private mode: Mode = 'sway';
   private modeBase = 3;
+  private lastPrefetch = 0;
   private homing = false;
   private t0 = performance.now();
   private last = performance.now();
@@ -241,15 +247,6 @@ export class RingEngine {
       this.wipeStart = performance.now() + 250;  // gold floods in once the ring appears
       this.hooks.onReady?.();
     }
-    // stream in the remaining frames, nearest first
-    const order = [...Array(FRAMES).keys()].sort(
-      (a, b) => Math.min((a - f + FRAMES) % FRAMES, (f - a + FRAMES) % FRAMES) -
-        Math.min((b - f + FRAMES) % FRAMES, (f - b + FRAMES) % FRAMES),
-    );
-    for (const fr of order) {
-      if (this.destroyed || token !== this.geoToken) return;
-      await Promise.all(layers.map((l) => this.ensure(l.name, fr)));
-    }
   }
 
   /** Freeze the old picture on the overlay and let CSS fade it out. */
@@ -288,7 +285,8 @@ export class RingEngine {
           gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
           gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
           gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-          this.cache.set(key, { tex });
+          this.cache.set(key, { tex, used: performance.now() });
+          this.evict();
         }
         resolve();
       };
@@ -302,11 +300,36 @@ export class RingEngine {
     return p;
   }
 
+  private evict() {
+    const live = [...this.cache.entries()].filter((e): e is [string, Tex] => e[1] !== 'missing');
+    if (live.length <= MAX_TEXTURES) return;
+    live.sort((a, b) => a[1].used - b[1].used);
+    for (const [key, tex] of live.slice(0, live.length - MAX_TEXTURES)) {
+      this.gl.deleteTexture(tex.tex);
+      this.cache.delete(key);
+    }
+  }
+
+  /** Keep the frames around the current angle loaded, leaning in the direction of travel. */
+  private prefetch(f: number, dir: number) {
+    if (!this.scene) return;
+    const behind = dir < 0 ? WINDOW_AHEAD : WINDOW_BEHIND;
+    const ahead = dir < 0 ? WINDOW_BEHIND : WINDOW_AHEAD;
+    const base = Math.floor(f);
+    for (let d = -behind; d <= ahead; d++) {
+      const fr = (((base + d) % FRAMES) + FRAMES) % FRAMES;
+      for (const l of this.scene.layers) void this.ensure(l.name, fr);
+    }
+  }
+
   private nearest(layer: string, f: number): Tex | null {
     for (let d = 0; d < FRAMES / 2; d++) {
       for (const g of [f - d, f + d]) {
         const e = this.cache.get(frameUrl(layer, (g + FRAMES * 2) % FRAMES));
-        if (e && e !== 'missing') return e;
+        if (e && e !== 'missing') {
+          e.used = performance.now();
+          return e;
+        }
       }
     }
     return null;
@@ -334,7 +357,12 @@ export class RingEngine {
     const swing = this.mode === 'side' ? 0.6 : 2.1;
     const sway = this.reduced ? 0 : Math.sin(((now - this.t0) / 1000) * 0.42) * swing * this.swayWeight;
     if (this.mode === 'spin' && !this.dragging) this.userOffset += dt * 2.4;
+    const prev = this.pos;
     this.pos = this.userOffset + this.modeBase + sway;
+    if (now - this.lastPrefetch > 120) {
+      this.lastPrefetch = now;
+      this.prefetch(this.frameNow(), Math.sign(this.pos - prev));
+    }
     this.render(now);
   }
 
@@ -355,9 +383,11 @@ export class RingEngine {
 
     // square picture sized so the ring fills the stage, clear of the mode pills at the bottom
     const inset = Math.round(64 * dpr);
-    const side = Math.min(w * 1.3, (h - inset) * 1.4);
+    const usable = h - inset;
+    const side = Math.min(w * 1.3, usable * 1.28);
     const x0 = Math.round((w - side) / 2);
-    const y0 = Math.round(inset + (h - inset - side) / 2);
+    // the ring sits ~46% of the way down its square image: centre that in the free space
+    const y0 = Math.round(inset + usable / 2 - side * (1 - 0.456));
     gl.viewport(x0, y0, Math.round(side), Math.round(side));
 
     const f = this.frameNow();
