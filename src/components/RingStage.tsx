@@ -91,7 +91,7 @@ export default function RingStage({ geometry, materials, mode, label }: Props) {
         </p>
       )}
       {ready && hint && (
-        <p className="lux-ui pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 text-[9px] font-medium uppercase tracking-[0.22em] text-black/35">
+        <p className="lux-ui pointer-events-none absolute left-4 top-3 text-[9px] font-medium uppercase tracking-[0.22em] text-black/35">
           Drag to turn
         </p>
       )}

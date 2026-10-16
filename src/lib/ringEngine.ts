@@ -21,7 +21,7 @@ export type Materials = { metal: Metal; gem: Gem };
 type RGB = [number, number, number];
 
 export const METAL_TINT: Record<Metal, RGB> = {
-  yellow: [0.99, 0.84, 0.55],
+  yellow: [1.0, 0.82, 0.47],
   white: [0.93, 0.92, 0.9],
   rose: [0.97, 0.7, 0.6],
   platinum: [0.9, 0.91, 0.93],
@@ -109,7 +109,7 @@ export class RingEngine {
   private dragging = false;
   private lastX = 0;
   private mode: Mode = 'sway';
-  private modeBase = 0;
+  private modeBase = 3;
   private homing = false;
   private t0 = performance.now();
   private last = performance.now();
@@ -326,7 +326,7 @@ export class RingEngine {
       const home = Math.round(this.userOffset / FRAMES) * FRAMES;
       this.userOffset += (home - this.userOffset) * (1 - Math.exp(-dt * 3));
     }
-    const baseTarget = this.mode === 'side' ? FRAMES / 4 : 0;
+    const baseTarget = this.mode === 'side' ? FRAMES / 4 : this.mode === 'spin' ? 0 : 3;
     this.modeBase += (baseTarget - this.modeBase) * (1 - Math.exp(-dt * 3));
     if (!this.dragging && this.mode !== 'spin' && now - this.lastInteract > 900) {
       this.swayWeight = Math.min(1, this.swayWeight + dt / 1.6);
@@ -353,16 +353,19 @@ export class RingEngine {
     gl.clear(gl.COLOR_BUFFER_BIT);
     if (!this.scene) return;
 
-    // square picture, sized so the ring fills the stage
-    const side = Math.max(h * 1.32, Math.min(w, h * 1.7));
+    // square picture sized so the ring fills the stage, clear of the mode pills at the bottom
+    const inset = Math.round(64 * dpr);
+    const side = Math.min(w * 1.3, (h - inset) * 1.4);
     const x0 = Math.round((w - side) / 2);
-    const y0 = Math.round((h - side) / 2 + h * 0.02);
+    const y0 = Math.round(inset + (h - inset - side) / 2);
     gl.viewport(x0, y0, Math.round(side), Math.round(side));
 
     const f = this.frameNow();
     const f0 = Math.floor(f);
     const f1 = (f0 + 1) % FRAMES;
-    const mix = f - f0;
+    // hold each rendered frame crisp and only blend briefly between them
+    const u = Math.min(1, Math.max(0, (f - f0 - 0.3) / 0.4));
+    const mix = u * u * (3 - 2 * u);
 
     let wipe = this.wipeProgress();
     wipe = wipe < 1 ? -0.3 + (1 - Math.pow(1 - wipe, 3)) * 1.6 : 2;
