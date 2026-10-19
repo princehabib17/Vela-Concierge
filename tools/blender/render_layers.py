@@ -77,7 +77,23 @@ def area_light(name, loc, sx, sy, energy):
     return ob
 
 
-def setup(size, samples):
+def use_gpu():
+    """Switch Cycles to the best GPU backend available (Metal on Apple silicon)."""
+    prefs = bpy.context.preferences.addons['cycles'].preferences
+    for kind in ('METAL', 'OPTIX', 'CUDA', 'HIP', 'ONEAPI'):
+        try:
+            prefs.compute_device_type = kind
+        except TypeError:
+            continue
+        prefs.get_devices()
+        if any(d.type == kind for d in prefs.devices):
+            for d in prefs.devices:
+                d.use = d.type == kind
+            return kind
+    return None
+
+
+def setup(size, samples, gpu=False):
     bpy.ops.wm.read_factory_settings(use_empty=True)
     scene = bpy.context.scene
     objs = br.build(scene.collection)
@@ -144,7 +160,9 @@ def setup(size, samples):
     r.image_settings.color_mode = 'RGBA'
     r.image_settings.compression = 15
     c = scene.cycles
-    c.device = 'CPU'
+    backend = use_gpu() if gpu else None
+    c.device = 'GPU' if backend else 'CPU'
+    print('Cycles device:', backend or 'CPU', flush=True)
     c.samples = samples
     c.use_denoising = True
     c.max_bounces = 14
@@ -185,10 +203,11 @@ def main():
     ap.add_argument('--size', type=int, default=900)
     ap.add_argument('--samples', type=int, default=48)
     ap.add_argument('--shard', default='0/1')
+    ap.add_argument('--gpu', action='store_true', help='render on the GPU (Metal/OptiX/CUDA/HIP)')
     argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else sys.argv[1:]
     a = ap.parse_args(argv)
 
-    scene, objs, turn, floor = setup(a.size, a.samples)
+    scene, objs, turn, floor = setup(a.size, a.samples, a.gpu)
     layers = [l for l in all_layers() if not a.only or l in a.only.split(',')]
     frames = [a.frame] if a.frame is not None else list(range(a.frames))
     shard_i, shard_n = (int(x) for x in a.shard.split('/'))

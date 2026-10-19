@@ -6,7 +6,6 @@
  * change as a wipe sweeping across the ring.
  */
 
-export const FRAMES = 24;
 
 export type Cut = 'round' | 'oval' | 'emerald' | 'pear';
 export type Setting = 'claw' | 'halo' | 'bezel';
@@ -52,6 +51,9 @@ export function layersFor(g: Geometry): LayerRef[] {
 }
 
 const frameUrl = (layer: string, f: number) => `/ring/${layer}/${String(f).padStart(2, '0')}.webp`;
+
+/** Written by tools/blender/to_webp.py: how many angles were rendered. */
+type Manifest = { frames: number; size: number };
 
 const VERT = `
 attribute vec2 aPos;
@@ -114,6 +116,8 @@ export class RingEngine {
   private dragging = false;
   private lastX = 0;
   private mode: Mode = 'sway';
+  private frames = 24;
+  private manifest: Promise<void> | null = null;
   private modeBase = 3;
   private lastPrefetch = 0;
   private homing = false;
@@ -188,7 +192,7 @@ export class RingEngine {
 
   pointerMove(x: number, width: number) {
     if (!this.dragging) return;
-    this.userOffset -= ((x - this.lastX) / width) * FRAMES * 1.05;
+    this.userOffset -= ((x - this.lastX) / width) * this.frames * 1.05;
     this.lastX = x;
   }
 
@@ -231,12 +235,13 @@ export class RingEngine {
 
   async setGeometry(geo: Geometry) {
     const token = ++this.geoToken;
+    await this.loadManifest();
     const layers = layersFor(geo);
     this.hooks.onBusy?.(true);
     const f = Math.floor(this.frameNow());
     // show as soon as the frames around the current angle exist for every layer
     await Promise.all(layers.map((l) => this.ensure(l.name, f)));
-    await Promise.all(layers.map((l) => this.ensure(l.name, (f + 1) % FRAMES)));
+    await Promise.all(layers.map((l) => this.ensure(l.name, (f + 1) % this.frames)));
     if (this.destroyed || token !== this.geoToken) return;
 
     if (this.scene) this.dissolve();
@@ -247,6 +252,19 @@ export class RingEngine {
       this.wipeStart = performance.now() + 250;  // gold floods in once the ring appears
       this.hooks.onReady?.();
     }
+  }
+
+  private loadManifest() {
+    this.manifest ??= fetch('/ring/manifest.json')
+      .then((r) => (r.ok ? (r.json() as Promise<Manifest>) : null))
+      .then((m) => {
+        if (m?.frames) {
+          this.frames = m.frames;
+          this.modeBase = m.frames / 8;
+        }
+      })
+      .catch(() => undefined);
+    return this.manifest;
   }
 
   /** Freeze the old picture on the overlay and let CSS fade it out. */
@@ -317,15 +335,15 @@ export class RingEngine {
     const ahead = dir < 0 ? WINDOW_BEHIND : WINDOW_AHEAD;
     const base = Math.floor(f);
     for (let d = -behind; d <= ahead; d++) {
-      const fr = (((base + d) % FRAMES) + FRAMES) % FRAMES;
+      const fr = (((base + d) % this.frames) + this.frames) % this.frames;
       for (const l of this.scene.layers) void this.ensure(l.name, fr);
     }
   }
 
   private nearest(layer: string, f: number): Tex | null {
-    for (let d = 0; d < FRAMES / 2; d++) {
+    for (let d = 0; d < this.frames / 2; d++) {
       for (const g of [f - d, f + d]) {
-        const e = this.cache.get(frameUrl(layer, (g + FRAMES * 2) % FRAMES));
+        const e = this.cache.get(frameUrl(layer, (g + this.frames * 2) % this.frames));
         if (e && e !== 'missing') {
           e.used = performance.now();
           return e;
@@ -338,7 +356,7 @@ export class RingEngine {
   /* ── frame loop ──────────────────────────────────────────────────── */
 
   private frameNow() {
-    return ((this.pos % FRAMES) + FRAMES) % FRAMES;
+    return ((this.pos % this.frames) + this.frames) % this.frames;
   }
 
   private tick(now: number) {
@@ -346,17 +364,17 @@ export class RingEngine {
     this.last = now;
 
     if (this.homing) {
-      const home = Math.round(this.userOffset / FRAMES) * FRAMES;
+      const home = Math.round(this.userOffset / this.frames) * this.frames;
       this.userOffset += (home - this.userOffset) * (1 - Math.exp(-dt * 3));
     }
-    const baseTarget = this.mode === 'side' ? FRAMES / 4 : this.mode === 'spin' ? 0 : 3;
+    const baseTarget = this.mode === 'side' ? this.frames / 4 : this.mode === 'spin' ? 0 : this.frames / 8;
     this.modeBase += (baseTarget - this.modeBase) * (1 - Math.exp(-dt * 3));
     if (!this.dragging && this.mode !== 'spin' && now - this.lastInteract > 900) {
       this.swayWeight = Math.min(1, this.swayWeight + dt / 1.6);
     }
-    const swing = this.mode === 'side' ? 0.6 : 2.1;
+    const swing = (this.mode === 'side' ? 0.6 : 2.1) * (this.frames / 24);
     const sway = this.reduced ? 0 : Math.sin(((now - this.t0) / 1000) * 0.42) * swing * this.swayWeight;
-    if (this.mode === 'spin' && !this.dragging) this.userOffset += dt * 2.4;
+    if (this.mode === 'spin' && !this.dragging) this.userOffset += dt * 2.4 * (this.frames / 24);
     const prev = this.pos;
     this.pos = this.userOffset + this.modeBase + sway;
     if (now - this.lastPrefetch > 120) {
@@ -392,7 +410,7 @@ export class RingEngine {
 
     const f = this.frameNow();
     const f0 = Math.floor(f);
-    const f1 = (f0 + 1) % FRAMES;
+    const f1 = (f0 + 1) % this.frames;
     // hold each rendered frame crisp and only blend briefly between them
     const u = Math.min(1, Math.max(0, (f - f0 - 0.3) / 0.4));
     const mix = u * u * (3 - 2 * u);

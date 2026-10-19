@@ -17,4 +17,10 @@ for layer in sorted(os.listdir(src)):
         im = Image.open(os.path.join(src, layer, name)).convert('RGBA')
         im.save(out, 'WEBP', quality=86, method=5, alpha_quality=90)
         total += os.path.getsize(out)
-print('wrote', round(total / 1e6, 1), 'MB')
+import json
+layers = [l for l in os.listdir(src) if os.path.isdir(os.path.join(src, l))]
+frames = len([n for n in os.listdir(os.path.join(src, layers[0])) if n.endswith('.png')])
+size = Image.open(os.path.join(src, layers[0], '00.png')).size[0]
+with open(os.path.join(dst, 'manifest.json'), 'w') as fh:
+    json.dump({'frames': frames, 'size': size}, fh)
+print('wrote', round(total / 1e6, 1), 'MB;', frames, 'frames at', size, 'px')
