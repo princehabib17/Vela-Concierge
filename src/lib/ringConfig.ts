@@ -1,4 +1,4 @@
-import type { Band, Cut, Gem, Metal, Setting } from './ringEngine';
+import type { Band, Cut, Gem, Metal, Setting } from './ringTypes';
 
 export type RingConfig = {
   cut: Cut;

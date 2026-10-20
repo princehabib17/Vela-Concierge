@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import RingStage from '@/components/RingStage';
-import type { Mode } from '@/lib/ringEngine';
+import type { Mode } from '@/lib/ringTypes';
 import {
   BANDS,
   CARATS,
@@ -183,6 +183,7 @@ export default function Configurator3D() {
         <RingStage
           geometry={{ cut: config.cut, setting: config.setting, band: config.band }}
           materials={{ metal: config.metal, gem: config.gem }}
+          carat={config.carat}
           mode={mode}
           label={summary}
         />
