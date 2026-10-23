@@ -25,26 +25,26 @@ export default function RingSizer() {
     >
       <div className="flex flex-col gap-8">
         <div className="vela-card-surface space-y-6 p-6 text-center">
-          <p className="vela-type-body text-vela-light/80">
+          <p className="vela-type-body text-cloud/80">
             Place a ring that fits you well on the screen. Adjust the slider until the circle exactly matches the{' '}
-            <strong className="font-medium text-vela-light">inside</strong> of your ring.
+            <strong className="font-bold text-cloud">inside</strong> of your ring.
           </p>
 
-          <div className="relative flex h-64 items-center justify-center overflow-hidden rounded-xl border border-vela-gray/40 bg-vela-black">
+          <div className="relative flex h-64 items-center justify-center overflow-hidden rounded-xl border border-midnight-80/40 bg-midnight">
             <div className="absolute inset-0 flex items-center justify-center opacity-20">
-              <div className="h-full w-px bg-vela-gold" />
-              <div className="absolute h-px w-full bg-vela-gold" />
+              <div className="h-full w-px bg-clay" />
+              <div className="absolute h-px w-full bg-clay" />
             </div>
 
             <div
-              className="rounded-full border-2 border-vela-gold shadow-[0_0_15px_rgba(251,222,147,0.3)] transition-all duration-75"
+              className="rounded-full border-2 border-clay shadow-[0_0_15px_rgba(233,232,227,0.3)] transition-all duration-75"
               style={{
                 width: `${diameter * 4}px`,
                 height: `${diameter * 4}px`
               }}
             />
 
-            <div className="vela-type-ui-title absolute bottom-4 tabular-nums text-vela-gold">
+            <div className="vela-type-ui-title absolute bottom-4 tabular-nums text-clay">
               {diameter.toFixed(1)} mm
             </div>
           </div>
@@ -57,7 +57,7 @@ export default function RingSizer() {
               step="0.1"
               value={diameter}
               onChange={(e) => setDiameter(parseFloat(e.target.value))}
-              className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-vela-gray accent-vela-gold"
+              className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-midnight-80 accent-clay"
             />
             <div className="vela-type-micro flex justify-between">
               <span>Smaller</span>
@@ -69,21 +69,21 @@ export default function RingSizer() {
         <div className="grid grid-cols-3 gap-3">
           <div className="vela-card-surface p-4 text-center">
             <p className="vela-field-label">US</p>
-            <p className="text-2xl font-serif text-vela-gold">{sizes.us}</p>
+            <p className="text-2xl font-bold tabular-nums text-clay">{sizes.us}</p>
           </div>
           <div className="vela-card-surface p-4 text-center">
             <p className="vela-field-label">UK</p>
-            <p className="text-2xl font-serif text-vela-gold">{sizes.uk}</p>
+            <p className="text-2xl font-bold tabular-nums text-clay">{sizes.uk}</p>
           </div>
           <div className="vela-card-surface p-4 text-center">
             <p className="vela-field-label">EU</p>
-            <p className="text-2xl font-serif text-vela-gold">{sizes.eu}</p>
+            <p className="text-2xl font-bold tabular-nums text-clay">{sizes.eu}</p>
           </div>
         </div>
 
-        <div className="flex items-start gap-3 rounded-xl border border-vela-gold/25 bg-vela-gold/10 p-4 text-vela-gold">
+        <div className="flex items-start gap-3 rounded-xl border border-clay/25 bg-clay/10 p-4 text-clay">
           <Info size={20} strokeWidth={1.25} className="mt-0.5 shrink-0" />
-          <p className="vela-type-body text-vela-gold">
+          <p className="vela-type-body text-clay">
             This is an estimation tool. For bespoke orders, we send a physical sizing kit to guarantee the perfect fit before crafting begins.
           </p>
         </div>

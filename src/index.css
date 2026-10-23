@@ -1,53 +1,71 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Cardo:wght@400;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&display=swap');
+/*
+ * Vela Jewellers — brand system, from the Brand Style Guide v1.0.
+ *
+ * Colour: Midnight, Stone, Clay and Cloud with their 80/60/40/20% tints, and nothing else.
+ * Type:   Gotham. Bold for headers and subheads, Book for body copy. The serif lives only in
+ *         the logo artwork; there is no serif typeface in the interface.
+ *
+ * Gotham is a licensed typeface. It is used wherever it is installed; until licensed web font
+ * files are added (add a url() source to the two @font-face rules below), Montserrat, the
+ * closest open equivalent, stands in at the same two weights.
+ */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap');
 @import "tailwindcss";
 
-/* ─── Design Tokens ──────────────────────────────────────────────── */
-@theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "Playfair Display", ui-serif, Georgia, serif;
-
-  /* Brand palette */
-  --color-vela-black:      #050505;
-  --color-vela-dark:       #111111;
-  --color-vela-gold:       #FBDE93;
-  --color-vela-gold-muted: #c2a86b;
-  --color-vela-gold-deep:  #9b7a2a;
-  --color-vela-light:      #f5f5f5;
-  --color-vela-gray:       #333333;
-
-  /* Animation tokens */
-  --animate-shimmer:    shimmer 3.2s ease-in-out infinite;
-  --animate-glow-pulse: glow-pulse 2.4s ease-in-out infinite;
-  --animate-float:      float 4s ease-in-out infinite;
-
-  @keyframes shimmer {
-    0%   { background-position: -200% center; }
-    100% { background-position:  200% center; }
-  }
-
-  @keyframes glow-pulse {
-    0%, 100% { opacity: 0.55; }
-    50%       { opacity: 1; }
-  }
-
-  @keyframes float {
-    0%, 100% { transform: translateY(0px); }
-    50%       { transform: translateY(-6px); }
-  }
+@font-face {
+  font-family: "Gotham";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local("Gotham Book"), local("Gotham-Book");
+}
+@font-face {
+  font-family: "Gotham";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: local("Gotham Bold"), local("Gotham-Bold");
 }
 
-/* ─── Configurator light-theme surface vars (used by Configurator3D) */
+/* ─── Design tokens ──────────────────────────────────────────────── */
+@theme {
+  --font-sans: "Gotham", "Montserrat", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Gotham", "Montserrat", ui-sans-serif, system-ui, sans-serif;
+
+  /* Midnight — CMYK 60 40 40 100 */
+  --color-midnight:    #000000;
+  --color-midnight-80: #333333;
+  --color-midnight-60: #666666;
+  --color-midnight-40: #999999;
+  --color-midnight-20: #cccccc;
+  /* Stone — CMYK 61 53 52 23 */
+  --color-stone:    #616161;
+  --color-stone-80: #818181;
+  --color-stone-60: #a0a0a0;
+  --color-stone-40: #c0c0c0;
+  --color-stone-20: #dfdfdf;
+  /* Clay — CMYK 8 6 9 0 */
+  --color-clay:    #e9e8e3;
+  --color-clay-80: #edede9;
+  --color-clay-60: #f2f1ee;
+  --color-clay-40: #f6f6f4;
+  --color-clay-20: #fbfaf9;
+  /* Cloud — CMYK 2 2 2 0 */
+  --color-cloud:    #f7f5f4;
+  --color-cloud-80: #f9f7f6;
+  --color-cloud-60: #faf9f8;
+  --color-cloud-40: #fcfbfb;
+  --color-cloud-20: #fdfdfd;
+}
+
+/* ─── Light surfaces (the 3D studio) ─────────────────────────────── */
 @layer base {
   :root {
-    --lux-bg:           #f1f1f1;
-    --lux-surface:      #ffffff;
-    --lux-text-primary: #121212;
-    --lux-text-muted:   #707070;
-    --lux-accent:       #fbde93;
-    --lux-border:       #d8d8d8;
-    --lux-border-strong:#121212;
-    --lux-radius-sm:    10px;
-    --lux-radius-md:    14px;
+    --lux-bg:           #f7f5f4; /* Cloud */
+    --lux-surface:      #fdfdfd; /* Cloud 20% */
+    --lux-text-primary: #000000; /* Midnight */
+    --lux-text-muted:   #616161; /* Stone */
+    --lux-border:       #dfdfdf; /* Stone 20% */
     --lux-shadow-soft:  0 10px 40px rgba(0, 0, 0, 0.06);
   }
 }
@@ -58,10 +76,10 @@
 
   #root { height: 100%; min-height: 100dvh; }
 
-  body { @apply bg-vela-black text-vela-light font-sans antialiased; }
+  body { @apply bg-midnight text-cloud font-sans antialiased; }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply font-serif font-normal tracking-wide;
+    @apply font-sans font-bold;
   }
 }
 
@@ -73,136 +91,92 @@
     padding-bottom: calc(5.25rem + env(safe-area-inset-bottom, 0px));
   }
 
-  /* Typography scale (hierarchy = kicker → title → lede → body → micro) */
+  /*
+   * Type roles (dark routes): kicker → title → lede → body → micro.
+   * Headers and subheads are Gotham Bold in spaced capitals; body copy is Gotham Book.
+   */
   .vela-kicker {
-    @apply mb-2 text-[10px] font-medium uppercase tracking-[0.22em] text-vela-gold;
+    @apply mb-2 text-[10px] font-bold uppercase tracking-[0.24em] text-stone-40;
   }
-  /* Kicker text without default margin (stack spacing manually) */
   .vela-kicker-text {
-    @apply text-[10px] font-medium uppercase tracking-[0.22em] text-vela-gold;
+    @apply text-[10px] font-bold uppercase tracking-[0.24em] text-stone-40;
   }
   .vela-hero-title {
-    @apply font-serif text-4xl font-normal leading-[1.08] tracking-[0.02em] text-vela-light;
-  }
-  .vela-type-display {
-    @apply font-serif text-3xl font-normal leading-[1.12] tracking-[0.02em] text-vela-light sm:text-4xl;
+    @apply text-[30px] font-bold uppercase leading-[1.08] tracking-[0.06em] text-cloud sm:text-[34px];
   }
   .vela-page-title {
-    @apply font-serif text-2xl font-normal leading-tight tracking-[0.02em] text-vela-light;
+    @apply text-[20px] font-bold uppercase leading-tight tracking-[0.08em] text-cloud;
   }
   .vela-type-section {
-    @apply font-serif text-lg font-normal tracking-[0.03em] text-vela-light;
+    @apply text-[13px] font-bold uppercase leading-snug tracking-[0.12em] text-cloud;
   }
   .vela-page-lede {
-    @apply mt-2 max-w-sm text-sm font-light leading-relaxed text-vela-light/60;
+    @apply mt-2 max-w-sm text-[13px] font-normal leading-relaxed text-cloud/65;
   }
   .vela-type-body {
-    @apply font-sans text-sm font-light leading-relaxed text-vela-light/85;
+    @apply text-sm font-normal leading-relaxed text-cloud/85;
   }
   .vela-type-micro {
-    @apply font-sans text-[9px] font-medium uppercase tracking-[0.14em] text-vela-light/50;
+    @apply text-[9px] font-bold uppercase tracking-[0.14em] text-cloud/50;
   }
   .vela-type-ui-title {
-    @apply font-sans text-sm font-medium tracking-wide text-vela-light;
+    @apply text-[13px] font-bold tracking-[0.04em] text-cloud;
   }
   .vela-type-caption {
-    @apply text-[11px] font-light leading-relaxed text-vela-light/50;
+    @apply text-[11px] font-normal leading-relaxed text-cloud/55;
   }
   .vela-card-label {
-    @apply text-[10px] font-medium uppercase tracking-[0.18em] text-vela-light/55;
+    @apply text-[10px] font-bold uppercase tracking-[0.18em] text-cloud/55;
   }
   .vela-field-label {
-    @apply mb-1 text-[10px] font-medium uppercase tracking-[0.14em] text-vela-light/50;
+    @apply mb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-cloud/50;
   }
   .vela-type-card-hero {
-    @apply font-serif text-xl font-normal tracking-[0.03em] text-vela-light;
-  }
-  .vela-wordmark {
-    @apply font-serif text-lg uppercase tracking-[0.14em] text-vela-light;
-  }
-  .vela-splash-subtitle {
-    @apply text-[10px] font-light uppercase tracking-[0.32em] text-vela-light/55;
+    @apply text-[16px] font-bold uppercase tracking-[0.08em] text-cloud;
   }
   .vela-btn-primary {
-    @apply rounded-xl bg-vela-gold py-4 text-center text-sm font-medium uppercase tracking-[0.12em] text-vela-black transition-colors hover:bg-vela-gold-muted disabled:cursor-not-allowed disabled:opacity-45;
+    @apply inline-flex h-12 items-center justify-center rounded-full bg-cloud px-8 text-center text-[11px] font-bold uppercase tracking-[0.2em] text-midnight transition-colors hover:bg-clay disabled:cursor-not-allowed disabled:opacity-45;
   }
 
-  /* Vertical rhythm (prefer over ad-hoc gap-y) */
-  /* 4px grid: 2=8px, 3=12px, 4=16px, 6=24px, 8=32px, 12=48px, 16=64px */
+  /* Vertical rhythm */
   .vela-stack-tight { @apply flex flex-col gap-2; }
   .vela-stack       { @apply flex flex-col gap-4; }
-  .vela-stack-loose { @apply flex flex-col gap-6; }
   .vela-section-gap { @apply space-y-6; }
-  .vela-inset-card  { @apply p-4 sm:p-6; }
 
-  /* Surface / icon tokens */
-  .vela-card-surface { @apply rounded-xl border border-vela-gray/25 bg-vela-dark; }
+  /* Surfaces and icon buttons */
+  .vela-card-surface { @apply rounded-2xl border border-stone/40 bg-midnight-80/40; }
   .vela-icon-btn {
-    @apply rounded-full p-2 text-vela-light/75 transition-colors
-           hover:text-vela-gold
+    @apply rounded-full p-2 text-cloud/75 transition-colors
+           hover:text-cloud
            focus-visible:outline focus-visible:outline-2
-           focus-visible:outline-offset-2 focus-visible:outline-vela-gold/60;
+           focus-visible:outline-offset-2 focus-visible:outline-clay/60;
   }
 
-  /* Gold text gradient — hero / accent only; avoid on body copy (maison calm) */
-  .vela-text-gold {
-    background: linear-gradient(135deg, #FBDE93 0%, #e8c56a 45%, #FBDE93 100%);
-    background-size: 200% auto;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    animation: var(--animate-shimmer);
+  /*
+   * Brand marks drawn in any brand colour: the shape comes from the artwork as a mask and
+   * the colour from `color` (currentColor), so the star and seal are never recoloured by hand.
+   */
+  .vela-mark {
+    background-color: currentColor;
+    -webkit-mask: var(--vela-mark) center / contain no-repeat;
+    mask: var(--vela-mark) center / contain no-repeat;
+  }
+  .vela-mark-star { --vela-mark: url('/brand/vela-star.png'); aspect-ratio: 495 / 512; }
+  .vela-mark-seal { --vela-mark: url('/brand/vela-seal.png'); aspect-ratio: 1024 / 1017; }
+
+  /* The V and star pattern from the style sheet, on Clay. */
+  .vela-pattern {
+    background: #e9e8e3 url('/brand/vela-pattern.png') repeat;
+    background-size: 199.5px 218.5px;
   }
 
-  /* Gold shimmer overlay (apply to a ::before / absolute div) */
-  .vela-shimmer-overlay {
-    background: linear-gradient(
-      105deg,
-      transparent 40%,
-      rgba(251, 222, 147, 0.07) 50%,
-      transparent 60%
-    );
-    background-size: 200% 100%;
-    animation: var(--animate-shimmer);
-  }
-
-  /* Glow pulse for active indicators */
-  .vela-glow { animation: var(--animate-glow-pulse); }
-
-  /* Float for decorative elements */
-  .vela-float { animation: var(--animate-float); }
-
-  /* Lux configurator aliases */
-  .lux-bg      { background-color: var(--lux-bg); }
-  .lux-surface { background-color: var(--lux-surface); }
+  /* Light-surface type for the 3D studio (mirrors the dark roles) */
   .lux-text    { color: var(--lux-text-primary); }
-  .lux-muted   { color: var(--lux-text-muted); }
-  .lux-accent  { color: #9b7a2a; }
-  .lux-border  { border-color: var(--lux-border); }
   .lux-ui      { font-family: var(--font-sans); letter-spacing: 0.04em; }
-  .lux-display { font-family: var(--font-serif); letter-spacing: 0.02em; }
-  /* Mirrors dark-route hierarchy on light configurator */
+  .lux-display { font-family: var(--font-sans); font-weight: 700; letter-spacing: 0.06em; }
   .lux-kicker {
-    font-family: var(--font-sans); letter-spacing: 0.04em;
-    @apply text-[10px] font-medium uppercase tracking-[0.2em] text-[#9b7a2a];
-  }
-  .lux-page-title {
-    font-family: var(--font-serif); letter-spacing: 0.02em;
-    @apply text-xl font-normal leading-tight tracking-tight text-[#121212];
-  }
-  .lux-page-lede {
-    font-family: var(--font-sans); letter-spacing: 0.04em;
-    @apply mt-0.5 text-[10px] font-normal uppercase tracking-[0.16em] text-[#707070];
-  }
-  .lux-chip {
-    font-family: var(--font-sans); letter-spacing: 0.04em;
-    @apply inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border px-5 text-[10px] font-medium uppercase tracking-[0.14em] transition-colors;
-  }
-  .lux-chip-inactive {
-    @apply border-[#d8d8d8] bg-white text-[#121212] hover:border-[#b8b8b8];
-  }
-  .lux-chip-active {
-    @apply border-[#121212] bg-[#121212] text-[#f5f5f5];
+    font-family: var(--font-sans);
+    @apply text-[10px] font-bold uppercase tracking-[0.24em] text-stone;
   }
 
   /* Scrollbar hide */

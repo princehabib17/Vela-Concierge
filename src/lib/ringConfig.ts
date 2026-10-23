@@ -1,10 +1,11 @@
-import type { Band, Cut, Gem, Metal, Setting } from './ringEngine';
+import type { Band, Cut, Finish, Gem, Metal, Setting } from './ringTypes';
 
 export type RingConfig = {
   cut: Cut;
   setting: Setting;
   band: Band;
   metal: Metal;
+  finish: Finish;
   gem: Gem;
   source: 'lab' | 'mined';
   carat: number;
@@ -17,6 +18,7 @@ export const DEFAULT_CONFIG: RingConfig = {
   setting: 'claw',
   band: 'pave',
   metal: 'yellow',
+  finish: 'polished',
   gem: 'diamond',
   source: 'lab',
   carat: 1.5,
@@ -52,6 +54,11 @@ export const METALS: Option<Metal>[] = [
   { id: 'platinum', label: 'Platinum' },
 ];
 
+export const FINISHES: Option<Finish>[] = [
+  { id: 'polished', label: 'Mirror polish', detail: 'A high shine that catches every light' },
+  { id: 'satin', label: 'Satin brushed', detail: 'A soft, directional grain, quietly modern' },
+];
+
 export const GEMS: Option<Gem>[] = [
   { id: 'diamond', label: 'Diamond' },
   { id: 'sapphire', label: 'Sapphire' },
@@ -82,4 +89,48 @@ export function estimate(c: RingConfig): { total: number; lines: Array<[string, 
     ['Metal', c.metal === 'platinum' ? 900 : 0],
   ];
   return { total: lines.reduce((s, [, v]) => s + v, 0), lines: lines.filter(([, v]) => v > 0) };
+}
+
+/* ------------------------------------------------- shareable URL state */
+
+export type StepId = 'shape' | 'setting' | 'band' | 'metal' | 'stone' | 'finish';
+const STEP_IDS: StepId[] = ['shape', 'setting', 'band', 'metal', 'stone', 'finish'];
+
+const pick = <T extends string>(list: Option<T>[], v: unknown, fallback: T): T =>
+  list.some((o) => o.id === v) ? (v as T) : fallback;
+
+/** Serialises a design to a compact, URL-safe hash such as `#ring=round.claw.pave.yellow.polished.diamond.lab.1.5.6.step-metal`. */
+export function encodeDesign(c: RingConfig, step: StepId): string {
+  const text = encodeURIComponent(c.engraving).replace(/\./g, '%2E');
+  return `#ring=${[c.cut, c.setting, c.band, c.metal, c.finish, c.gem, c.source, c.carat, c.size, text || '-', step].join('~')}`;
+}
+
+/** Reads a hash written by {@link encodeDesign}. Anything missing or invalid falls back to the defaults. */
+export function decodeDesign(hash: string): { config: RingConfig; step: StepId } {
+  const d = DEFAULT_CONFIG;
+  const raw = hash.replace(/^#ring=/, '');
+  if (raw === hash || !raw) return { config: d, step: 'shape' };
+  const [cut, setting, band, metal, finish, gem, source, carat, size, engr, step] = raw.split('~');
+  const num = (v: string | undefined, allowed: number[], fb: number) => (allowed.includes(Number(v)) ? Number(v) : fb);
+  let engraving = '';
+  try {
+    engraving = engr && engr !== '-' ? decodeURIComponent(engr).slice(0, 20) : '';
+  } catch {
+    engraving = '';
+  }
+  return {
+    config: {
+      cut: pick(CUTS, cut, d.cut),
+      setting: pick(SETTINGS, setting, d.setting),
+      band: pick(BANDS, band, d.band),
+      metal: pick(METALS, metal, d.metal),
+      finish: pick(FINISHES, finish, d.finish),
+      gem: pick(GEMS, gem, d.gem),
+      source: source === 'mined' ? 'mined' : 'lab',
+      carat: num(carat, CARATS, d.carat),
+      size: num(size, SIZES, d.size),
+      engraving,
+    },
+    step: (STEP_IDS as string[]).includes(step) ? (step as StepId) : 'shape',
+  };
 }

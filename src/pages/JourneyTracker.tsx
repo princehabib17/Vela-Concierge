@@ -52,23 +52,23 @@ export default function JourneyTracker() {
     <PageShell kicker="Commission" title="Your Vela Journey" subtitle="Order #VJ-8842">
       <div className="relative">
         {/* Vertical Line */}
-        <div className="absolute left-[15px] top-4 bottom-8 w-[1px] bg-vela-gray/50" />
+        <div className="absolute left-[15px] top-4 bottom-8 w-[1px] bg-midnight-80/50" />
 
         <div className="space-y-8">
           {stages.map((stage, index) => (
             <div key={stage.id} className="relative z-10 flex gap-4">
               <div className="shrink-0 mt-1">
                 {stage.status === 'completed' ? (
-                  <div className="w-8 h-8 rounded-full bg-vela-gold/20 flex items-center justify-center">
-                    <CheckCircle2 className="text-vela-gold" size={20} />
+                  <div className="w-8 h-8 rounded-full bg-clay/20 flex items-center justify-center">
+                    <CheckCircle2 className="text-clay" size={20} />
                   </div>
                 ) : stage.status === 'active' ? (
-                  <div className="w-8 h-8 rounded-full bg-vela-gold flex items-center justify-center">
-                    <div className="w-3 h-3 rounded-full bg-vela-black" />
+                  <div className="w-8 h-8 rounded-full bg-clay flex items-center justify-center">
+                    <div className="w-3 h-3 rounded-full bg-midnight" />
                   </div>
                 ) : (
-                  <div className="w-8 h-8 rounded-full bg-vela-dark border border-vela-gray flex items-center justify-center">
-                    <Circle className="text-vela-gray" size={12} />
+                  <div className="w-8 h-8 rounded-full bg-midnight-80/50 border border-midnight-80 flex items-center justify-center">
+                    <Circle className="text-midnight-80" size={12} />
                   </div>
                 )}
               </div>
@@ -80,7 +80,7 @@ export default function JourneyTracker() {
                 <h3
                   className={cn(
                     'vela-type-section mb-1',
-                    stage.status === 'active' ? 'text-vela-gold' : 'text-vela-light'
+                    stage.status === 'active' ? 'text-clay' : 'text-cloud'
                   )}
                 >
                   {stage.title}
@@ -97,9 +97,9 @@ export default function JourneyTracker() {
                     {stage.media && (
                       <div className="relative rounded-md overflow-hidden mb-3 aspect-video">
                         <img src={stage.media} alt="Update media" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                        <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
-                          <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center">
-                            <Play className="text-white ml-1" size={16} />
+                        <div className="absolute inset-0 bg-midnight/20 flex items-center justify-center">
+                          <div className="w-10 h-10 rounded-full bg-cloud/20 backdrop-blur-md flex items-center justify-center">
+                            <Play className="text-cloud ml-1" size={16} />
                           </div>
                         </div>
                       </div>
@@ -110,7 +110,7 @@ export default function JourneyTracker() {
                     )}
 
                     {stage.staff && (
-                      <div className="flex items-center justify-between border-t border-vela-gray/30 pt-3">
+                      <div className="flex items-center justify-between border-t border-midnight-80/30 pt-3">
                         <p className="vela-type-caption">— {stage.staff}</p>
 
                         {stage.status === 'active' && (
@@ -118,23 +118,23 @@ export default function JourneyTracker() {
                             <button
                               type="button"
                               onClick={() => setReaction(reaction === 'heart' ? null : 'heart')}
-                              className={cn("p-1.5 rounded-full transition-colors", reaction === 'heart' ? "bg-vela-gold/20" : "hover:bg-vela-gray/50")}
+                              className={cn("p-1.5 rounded-full transition-colors", reaction === 'heart' ? "bg-clay/20" : "hover:bg-midnight-80/50")}
                             >
-                              <Heart size={14} className={reaction === 'heart' ? "fill-vela-gold text-vela-gold" : "text-vela-light/50"} />
+                              <Heart size={14} className={reaction === 'heart' ? "fill-clay text-clay" : "text-cloud/50"} />
                             </button>
                             <button
                               type="button"
                               onClick={() => setReaction(reaction === 'sparkles' ? null : 'sparkles')}
-                              className={cn("p-1.5 rounded-full transition-colors", reaction === 'sparkles' ? "bg-vela-gold/20" : "hover:bg-vela-gray/50")}
+                              className={cn("p-1.5 rounded-full transition-colors", reaction === 'sparkles' ? "bg-clay/20" : "hover:bg-midnight-80/50")}
                             >
-                              <Sparkles size={14} className={reaction === 'sparkles' ? "fill-vela-gold text-vela-gold" : "text-vela-light/50"} />
+                              <Sparkles size={14} className={reaction === 'sparkles' ? "fill-clay text-clay" : "text-cloud/50"} />
                             </button>
                             <button
                               type="button"
                               onClick={() => setReaction(reaction === 'fire' ? null : 'fire')}
-                              className={cn("p-1.5 rounded-full transition-colors", reaction === 'fire' ? "bg-vela-gold/20" : "hover:bg-vela-gray/50")}
+                              className={cn("p-1.5 rounded-full transition-colors", reaction === 'fire' ? "bg-clay/20" : "hover:bg-midnight-80/50")}
                             >
-                              <Flame size={14} className={reaction === 'fire' ? "fill-vela-gold text-vela-gold" : "text-vela-light/50"} />
+                              <Flame size={14} className={reaction === 'fire' ? "fill-clay text-clay" : "text-cloud/50"} />
                             </button>
                           </div>
                         )}

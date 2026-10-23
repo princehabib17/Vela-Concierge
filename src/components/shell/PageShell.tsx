@@ -15,7 +15,7 @@ export type PageShellProps = {
 
 /**
  * Shared scroll column + typographic hierarchy for dark atelier routes.
- * Roles: see `.cursor/rules/vela-visual-system.mdc` (Cartier-inspired scale).
+ * Type roles follow the Vela Jewellers brand guide (see the tokens in index.css).
  */
 export function PageShell({
   kicker,

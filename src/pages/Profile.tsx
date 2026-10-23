@@ -15,67 +15,67 @@ export default function Profile() {
       }
     >
       <div className="mb-10 flex items-center gap-4">
-        <div className="vela-type-card-hero flex h-16 w-16 items-center justify-center rounded-full border border-vela-gold/30 bg-vela-dark text-vela-gold">
+        <div className="vela-type-card-hero flex h-16 w-16 items-center justify-center rounded-full border border-clay/30 bg-midnight-80/50 text-clay">
           E
         </div>
         <div>
-          <h2 className="vela-type-section text-vela-light">Eleanor Vance</h2>
+          <h2 className="vela-type-section text-cloud">Eleanor Vance</h2>
           <p className="vela-type-caption mt-0.5">eleanor.v@example.com</p>
         </div>
       </div>
 
       <div className="vela-stack">
-        <Link to="/jewellery-box" className="vela-card-surface flex items-center justify-between p-4 transition-colors hover:border-vela-gold/40 group">
+        <Link to="/jewellery-box" className="vela-card-surface flex items-center justify-between p-4 transition-colors hover:border-clay/40 group">
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-vela-black flex items-center justify-center">
-              <Box className="text-vela-gold" size={18} />
+            <div className="w-10 h-10 rounded-full bg-midnight flex items-center justify-center">
+              <Box className="text-clay" size={18} />
             </div>
             <div>
               <h3 className="vela-type-ui-title">Digital Jewellery Box</h3>
               <p className="vela-type-caption mt-0.5">2 pieces saved</p>
             </div>
           </div>
-          <ChevronRight size={18} className="text-vela-light/30 group-hover:text-vela-gold transition-colors" />
+          <ChevronRight size={18} className="text-cloud/30 group-hover:text-clay transition-colors" />
         </Link>
 
-        <Link to="/sizer" className="vela-card-surface flex items-center justify-between p-4 transition-colors hover:border-vela-gold/40 group">
+        <Link to="/sizer" className="vela-card-surface flex items-center justify-between p-4 transition-colors hover:border-clay/40 group">
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-vela-black flex items-center justify-center">
-              <Ruler className="text-vela-gold" size={18} />
+            <div className="w-10 h-10 rounded-full bg-midnight flex items-center justify-center">
+              <Ruler className="text-clay" size={18} />
             </div>
             <div>
               <h3 className="vela-type-ui-title">Ring Sizer Tool</h3>
               <p className="vela-type-caption mt-0.5">Size: US 6.5</p>
             </div>
           </div>
-          <ChevronRight size={18} className="text-vela-light/30 group-hover:text-vela-gold transition-colors" />
+          <ChevronRight size={18} className="text-cloud/30 group-hover:text-clay transition-colors" />
         </Link>
 
         <Link
           to="/wishlist"
-          className="vela-card-surface flex w-full items-center justify-between p-4 transition-colors hover:border-vela-gold/40 group"
+          className="vela-card-surface flex w-full items-center justify-between p-4 transition-colors hover:border-clay/40 group"
         >
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-vela-black flex items-center justify-center">
-              <Heart className="text-vela-gold" size={18} />
+            <div className="w-10 h-10 rounded-full bg-midnight flex items-center justify-center">
+              <Heart className="text-clay" size={18} />
             </div>
             <div>
               <h3 className="vela-type-ui-title">Wishlist</h3>
               <p className="vela-type-caption mt-0.5">4 items saved</p>
             </div>
           </div>
-          <ChevronRight size={18} className="text-vela-light/30 group-hover:text-vela-gold transition-colors" />
+          <ChevronRight size={18} className="text-cloud/30 group-hover:text-clay transition-colors" />
         </Link>
       </div>
 
-      <div className="mt-12 border-t border-vela-gray/20 pt-6">
-        <button type="button" className="vela-type-body w-full p-4 text-left text-vela-light/70 transition-colors hover:text-vela-light">
+      <div className="mt-12 border-t border-midnight-80/20 pt-6">
+        <button type="button" className="vela-type-body w-full p-4 text-left text-cloud/70 transition-colors hover:text-cloud">
           Contact Concierge
         </button>
-        <button type="button" className="vela-type-body w-full p-4 text-left text-vela-light/70 transition-colors hover:text-vela-light">
+        <button type="button" className="vela-type-body w-full p-4 text-left text-cloud/70 transition-colors hover:text-cloud">
           FAQ & Care Guide
         </button>
-        <button type="button" className="w-full p-4 text-left text-sm text-red-400/80 transition-colors hover:text-red-400">
+        <button type="button" className="w-full p-4 text-left text-sm text-stone-60 transition-colors hover:text-cloud">
           Sign Out
         </button>
       </div>
