@@ -13,7 +13,7 @@ export function BottomNav() {
   ];
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-vela-dark/90 backdrop-blur-md border-t border-vela-gray/50 pb-safe pt-2 px-6 z-50">
+    <div className="fixed bottom-0 left-0 right-0 bg-midnight-80/45 backdrop-blur-md border-t border-midnight-80/50 pb-safe pt-2 px-6 z-50">
       <div className="flex justify-between items-center max-w-md mx-auto">
         {tabs.map((tab) => {
           const isActive = location.pathname === tab.path || (tab.path !== '/' && location.pathname.startsWith(tab.path));
@@ -30,12 +30,12 @@ export function BottomNav() {
                 strokeWidth={1.5}
                 className={cn(
                   "transition-colors duration-300",
-                  isActive ? "text-vela-gold" : "text-vela-light/50"
+                  isActive ? "text-clay" : "text-cloud/50"
                 )} 
               />
               <span className={cn(
                 "text-[10px] uppercase tracking-wider transition-colors duration-300",
-                isActive ? "text-vela-gold" : "text-vela-light/50"
+                isActive ? "text-clay" : "text-cloud/50"
               )}>
                 {tab.name}
               </span>

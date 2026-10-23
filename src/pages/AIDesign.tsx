@@ -74,13 +74,13 @@ export default function AIDesign() {
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             placeholder="e.g. Rose gold oval sapphire, delicate pavé band, under $3,000..."
-            className="vela-type-body min-h-[120px] w-full resize-none rounded-xl border border-vela-gray/30 bg-vela-dark p-4 text-vela-light placeholder:text-vela-light/35 focus:border-vela-gold/45 focus:outline-none"
+            className="vela-type-body min-h-[120px] w-full resize-none rounded-xl border border-midnight-80/30 bg-midnight-80/50 p-4 text-cloud placeholder:text-cloud/35 focus:border-clay/45 focus:outline-none"
           />
           <button
             type="button"
             onClick={generateImages}
             disabled={!prompt || isGenerating}
-            className="absolute bottom-4 right-4 bg-vela-gold text-vela-black p-3 rounded-full disabled:opacity-50 disabled:cursor-not-allowed hover:bg-vela-gold-muted transition-all hover:scale-105"
+            className="absolute bottom-4 right-4 bg-clay text-midnight p-3 rounded-full disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-40 transition-all hover:scale-105"
           >
             {isGenerating ? <RefreshCw className="animate-spin" size={18} /> : <ArrowRight size={18} />}
           </button>
@@ -94,7 +94,7 @@ export default function AIDesign() {
                 key={i}
                 type="button"
                 onClick={() => setPrompt(sug)}
-                className="vela-type-body block w-full rounded-xl border border-vela-gray/25 bg-vela-dark/40 p-4 text-left text-vela-light/80 transition-all hover:border-vela-gold/35 hover:bg-vela-dark hover:text-vela-gold"
+                className="vela-type-body block w-full rounded-xl border border-midnight-80/25 bg-midnight-80/20 p-4 text-left text-cloud/80 transition-all hover:border-clay/35 hover:bg-midnight-80/50 hover:text-clay"
               >
                 {sug}
               </button>
@@ -103,9 +103,9 @@ export default function AIDesign() {
         )}
 
         {isGenerating && (
-          <div className="flex-1 flex flex-col items-center justify-center text-vela-gold">
+          <div className="flex-1 flex flex-col items-center justify-center text-clay">
             <Sparkles className="animate-pulse mb-4" size={32} strokeWidth={1} />
-            <p className="font-serif text-sm font-normal italic text-vela-gold/90">Visualizing your design…</p>
+            <p className="text-sm font-normal text-clay/90">Visualizing your design…</p>
           </div>
         )}
 
@@ -122,17 +122,17 @@ export default function AIDesign() {
                   onClick={() => setSelectedImage(i)}
                   className={cn(
                     "relative aspect-square rounded-lg overflow-hidden border-2 cursor-pointer transition-all duration-300",
-                    selectedImage === i ? "border-vela-gold scale-[0.98]" : "border-transparent hover:border-vela-gray/50"
+                    selectedImage === i ? "border-clay scale-[0.98]" : "border-transparent hover:border-midnight-80/50"
                   )}
                 >
                   <img src={img} alt={`Generated design ${i+1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                   <div className={cn(
                     "absolute inset-0 transition-colors duration-300",
-                    selectedImage === i ? "bg-vela-gold/10" : "bg-black/20 hover:bg-transparent"
+                    selectedImage === i ? "bg-clay/10" : "bg-midnight/20 hover:bg-transparent"
                   )} />
                   {selectedImage === i && (
-                    <div className="absolute top-3 right-3 bg-vela-gold text-vela-black p-1.5 rounded-full shadow-lg">
-                      <Heart size={14} className="fill-vela-black" />
+                    <div className="absolute top-3 right-3 bg-clay text-midnight p-1.5 rounded-full shadow-lg">
+                      <Heart size={14} className="fill-midnight" />
                     </div>
                   )}
                 </div>

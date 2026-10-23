@@ -51,8 +51,8 @@ export default function AIGenerator() {
   return (
     <div className="p-6 space-y-6 animate-in fade-in duration-500 pb-24">
       <div className="space-y-2">
-        <h2 className="text-2xl font-serif text-vela-gold">AI Design Generator</h2>
-        <p className="text-sm text-vela-light/70 font-light">
+        <h2 className="text-2xl text-clay">AI Design Generator</h2>
+        <p className="text-sm text-cloud/70 font-normal">
           Describe your vision, and our AI will visualize it.
         </p>
       </div>
@@ -63,12 +63,12 @@ export default function AIGenerator() {
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             placeholder="e.g. Rose gold oval sapphire, delicate pavé band..."
-            className="w-full bg-vela-dark border border-vela-gray/50 rounded-xl p-4 text-vela-light placeholder:text-vela-light/30 focus:outline-none focus:border-vela-gold/50 min-h-[120px] resize-none"
+            className="w-full bg-midnight-80/50 border border-midnight-80/50 rounded-xl p-4 text-cloud placeholder:text-cloud/30 focus:outline-none focus:border-clay/50 min-h-[120px] resize-none"
           />
           <button
             onClick={handleGenerate}
             disabled={isGenerating || !prompt.trim()}
-            className="absolute bottom-4 right-4 bg-vela-gold text-vela-black p-2 rounded-full disabled:opacity-50 disabled:cursor-not-allowed hover:bg-vela-gold-muted transition-colors"
+            className="absolute bottom-4 right-4 bg-clay text-midnight p-2 rounded-full disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-40 transition-colors"
           >
             {isGenerating ? <Loader2 className="animate-spin" size={20} /> : <Sparkles size={20} />}
           </button>
@@ -79,7 +79,7 @@ export default function AIGenerator() {
             <button
               key={i}
               onClick={() => setPrompt(suggestion)}
-              className="text-xs border border-vela-gray/50 rounded-full px-3 py-1.5 text-vela-light/70 hover:border-vela-gold/50 hover:text-vela-gold transition-colors text-left"
+              className="text-xs border border-midnight-80/50 rounded-full px-3 py-1.5 text-cloud/70 hover:border-clay/50 hover:text-clay transition-colors text-left"
             >
               {suggestion}
             </button>
@@ -88,12 +88,12 @@ export default function AIGenerator() {
       </div>
 
       {images.length > 0 && (
-        <div className="space-y-4 pt-4 border-t border-vela-gray/30">
+        <div className="space-y-4 pt-4 border-t border-midnight-80/30">
           <div className="flex justify-between items-center">
-            <h3 className="font-serif text-lg">Generated Concepts</h3>
+            <h3 className="text-lg">Generated Concepts</h3>
             <button 
               onClick={handleGenerate}
-              className="text-vela-gold text-sm flex items-center gap-1 hover:text-vela-gold-muted"
+              className="text-clay text-sm flex items-center gap-1 hover:text-stone-40"
             >
               <RefreshCw size={14} /> Regenerate
             </button>
@@ -104,11 +104,11 @@ export default function AIGenerator() {
               <div 
                 key={i}
                 onClick={() => setSelectedImage(i)}
-                className={`relative aspect-square rounded-xl overflow-hidden cursor-pointer border-2 transition-all ${selectedImage === i ? 'border-vela-gold' : 'border-transparent hover:border-vela-gray'}`}
+                className={`relative aspect-square rounded-xl overflow-hidden cursor-pointer border-2 transition-all ${selectedImage === i ? 'border-clay' : 'border-transparent hover:border-midnight-80'}`}
               >
                 <img src={img} alt={`Generated concept ${i+1}`} className="w-full h-full object-cover" />
                 {selectedImage === i && (
-                  <div className="absolute top-2 right-2 bg-vela-gold text-vela-black p-1 rounded-full">
+                  <div className="absolute top-2 right-2 bg-clay text-midnight p-1 rounded-full">
                     <Check size={16} />
                   </div>
                 )}
@@ -117,7 +117,7 @@ export default function AIGenerator() {
           </div>
 
           {selectedImage !== null && (
-            <button className="w-full bg-vela-gold text-vela-black font-medium py-4 rounded-xl mt-4 hover:bg-vela-gold-muted transition-colors">
+            <button className="w-full bg-clay text-midnight font-bold py-4 rounded-xl mt-4 hover:bg-stone-40 transition-colors">
               Save to Order Brief
             </button>
           )}

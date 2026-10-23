@@ -17,17 +17,19 @@ type Outline = { at: (t: number) => V2; verts?: V2[] };
 
 /** Width along the finger and radial thickness of the band at angle θ from the top. */
 export function bandSize(band: Band, theta: number) {
-  if (band === 'eternity') return { w: 0.23, t: 0.165 };
+  if (band === 'eternity') return { w: 0.21, t: 0.16 };
   const f = Math.pow((1 + Math.cos(theta)) / 2, 1.4); // 1 at the top, 0 underneath
-  return band === 'pave' ? { w: 0.19 + 0.07 * f, t: 0.14 + 0.035 * f } : { w: 0.165 + 0.05 * f, t: 0.135 + 0.035 * f };
+  // A slim, nearly parallel shank like Vela's Kaylee: only a whisper of taper.
+  return band === 'pave' ? { w: 0.185 + 0.025 * f, t: 0.15 + 0.012 * f } : { w: 0.17 + 0.025 * f, t: 0.145 + 0.012 * f };
 }
 
-/** A seamless tapered shank with a soft, comfort-fit cross-section. */
+/** A seamless shank with a flat-topped, softly squared cross-section. */
 function bandGeometry(band: Band) {
   const NT = 320;
   const NP = 40;
-  const n = 2.7; // superellipse: rounded but with a flat-ish face
+  const n = 4.5; // superellipse: flat top, straight sides, softened edges
   const pos = new Float32Array(NT * NP * 3);
+  const uv = new Float32Array(NT * NP * 2); // u runs around the finger so a brushed grain follows the band
   for (let i = 0; i < NT; i++) {
     const th = (i / NT) * Math.PI * 2;
     const { w, t } = bandSize(band, th);
@@ -44,6 +46,8 @@ function bandGeometry(band: Band) {
       pos[k] = rx * radial;
       pos[k + 1] = ry * radial;
       pos[k + 2] = (w / 2) * px;
+      uv[(i * NP + j) * 2] = (i / NT) * 24;
+      uv[(i * NP + j) * 2 + 1] = j / NP;
     }
   }
   const idx: number[] = [];
@@ -58,6 +62,7 @@ function bandGeometry(band: Band) {
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   g.setIndex(idx);
   g.computeVertexNormals();
   return g;
@@ -69,7 +74,7 @@ export type StoneSpec = { W: number; L: number; hc: number; dp: number; g: numbe
 
 /** Face-up size (W across the finger, L along it) and proportions for a cut and carat weight. */
 export function stoneSpec(cut: Cut, carat: number): StoneSpec {
-  const s = Math.cbrt(carat / 1.5);
+  const s = 0.88 * Math.cbrt(carat / 1.5); // a 1.5 ct round sits ~36% of the ring's width, as on the Kaylee
   const [W, L] = cut === 'round' ? [0.9, 0.9] : cut === 'oval' ? [0.78, 1.1] : cut === 'emerald' ? [0.76, 1.04] : [0.8, 1.2];
   const w = W * s;
   return {
@@ -331,8 +336,8 @@ export function buildRing({ cut, setting, band }: Geometry, carat: number): Ring
   const o = outlineFor(cut, s.W, s.L);
   const t0 = bandSize(band, 0).t;
   const bandTop = INNER_R + t0;
-  const yg = bandTop + 0.05 + s.dp + s.g / 2; // culet clears the top of the band
-  const r = 0.036 * Math.sqrt(s.W / 0.9);
+  const yg = bandTop + 0.6 * s.dp + s.g / 2; // set low: the culet tucks into the band under the gallery
+  const r = 0.044 * Math.sqrt(s.W / 0.9);
   const metal: THREE.BufferGeometry[] = [];
   const accents: Placement[] = [];
   const beads: Placement[] = [];
@@ -406,19 +411,19 @@ export function buildRing({ cut, setting, band }: Geometry, carat: number): Ring
   if (band !== 'plain') {
     const R0 = bandTop;
     const thStart = Math.asin(Math.min(0.9, (s.W * 0.28 + 0.06) / R0));
-    const thEnd = band === 'pave' ? 1.15 : Math.PI * 2 - thStart;
+    const thEnd = band === 'pave' ? 1.75 : Math.PI * 2 - thStart;
     const sides = band === 'pave' ? [1, -1] : [1];
     for (const side of sides) {
       let th = thStart;
       let prev: number | null = null;
       while (true) {
         const { w, t } = bandSize(band, th);
-        const d = w * 0.58;
+        const d = w * 0.5;
         const rad = INNER_R + t;
         const thc = th + (d * 0.58) / rad;
         if (thc > thEnd) break;
         const dir = new THREE.Vector3(Math.sin(side * thc), Math.cos(thc), 0);
-        accents.push({ pos: dir.clone().multiplyScalar(rad - 0.05 * d), up: dir, size: d });
+        accents.push({ pos: dir.clone().multiplyScalar(rad - 0.03 * d), up: dir, size: d });
         if (prev !== null) {
           const mid = (prev + thc) / 2;
           const md = new THREE.Vector3(Math.sin(side * mid), Math.cos(mid), 0);
@@ -445,10 +450,33 @@ export function buildRing({ cut, setting, band }: Geometry, carat: number): Ring
 
 /** A small round brilliant (diameter 1) for pavé and halo stones. */
 export function accentGeometry() {
-  return stoneGeometry('round', { W: 1, L: 1, hc: 0.16, dp: 0.43, g: 0.02 }, 16);
+  return stoneGeometry('round', { W: 1, L: 1, hc: 0.16, dp: 0.43, g: 0.02 }, 32);
 }
 
 /* ------------------------------------------------------- environment */
+
+type Box = { lon: number; el: number; w: number; h: number; v: number; tint?: [number, number, number] };
+
+/** The studio's softboxes and strip lights: longitude and elevation in radians, brightness, tint. */
+const STUDIO_BOXES: Box[] = [
+  { lon: 0.55, el: 0.35, w: 0.38, h: 0.42, v: 7, tint: [1, 0.97, 0.93] },
+  { lon: -1.9, el: 0.25, w: 0.42, h: 0.5, v: 4 },
+  { lon: 2.55, el: 0.12, w: 0.22, h: 0.6, v: 5 },
+  { lon: 1.45, el: 0.0, w: 0.05, h: 0.95, v: 10 },
+  { lon: -0.65, el: 0.05, w: 0.045, h: 0.9, v: 9 },
+  { lon: -2.75, el: 0.4, w: 0.06, h: 0.5, v: 6 },
+];
+
+/**
+ * World directions of the brightest lights in the studio, matching how three.js reads an
+ * equirect (longitude = atan2(z, x), elevation = asin(y)). A facet flashes when it mirrors one.
+ */
+export function studioKeyLights(count = 4): THREE.Vector3[] {
+  return [...STUDIO_BOXES]
+    .sort((a, b) => b.v - a.v)
+    .slice(0, count)
+    .map((b) => new THREE.Vector3(Math.cos(b.el) * Math.cos(b.lon), Math.sin(b.el), Math.cos(b.el) * Math.sin(b.lon)).normalize());
+}
 
 /**
  * A photographic jewellery studio as an HDR equirect: bright softboxes and strip lights
@@ -458,15 +486,7 @@ export function studioEnvironment() {
   const W = 1024;
   const H = 512;
   const data = new Uint16Array(W * H * 4);
-  type Box = { lon: number; el: number; w: number; h: number; v: number; tint?: [number, number, number] };
-  const boxes: Box[] = [
-    { lon: 0.55, el: 0.35, w: 0.38, h: 0.42, v: 7, tint: [1, 0.97, 0.93] },
-    { lon: -1.9, el: 0.25, w: 0.42, h: 0.5, v: 4 },
-    { lon: 2.55, el: 0.12, w: 0.22, h: 0.6, v: 5 },
-    { lon: 1.45, el: 0.0, w: 0.05, h: 0.95, v: 10 },
-    { lon: -0.65, el: 0.05, w: 0.045, h: 0.9, v: 9 },
-    { lon: -2.75, el: 0.4, w: 0.06, h: 0.5, v: 6 },
-  ];
+  const boxes = STUDIO_BOXES;
   const flags: Box[] = [
     { lon: 3.0, el: 0.1, w: 0.42, h: 0.75, v: 0.03 },
     { lon: 1.0, el: 0.1, w: 0.14, h: 0.7, v: 0.06 },
@@ -484,7 +504,8 @@ export function studioEnvironment() {
   const one = THREE.DataUtils.toHalfFloat(1);
   for (let j = 0; j < H; j++) {
     const el = -Math.PI / 2 + ((j + 0.5) / H) * Math.PI;
-    const base = (el > 0 ? 0.55 + 0.35 * Math.sin(el) : 0.5 + 0.38 * Math.sin(el)) + (el > 1.15 ? 2.2 * soft((Math.PI / 2 - el) / 0.42) : 0);
+    // Below the horizon is the pale studio floor: it bounces light back up, so white metals stay bright.
+    const base = (el > 0 ? 0.55 + 0.35 * Math.sin(el) : 0.58 + 0.3 * Math.sin(el)) + (el > 1.15 ? 2.2 * soft((Math.PI / 2 - el) / 0.42) : 0);
     for (let i = 0; i < W; i++) {
       let r = base, g = base, b = base;
       for (let l = 0; l < lights.length; l++) {
@@ -515,4 +536,145 @@ export function studioEnvironment() {
   tex.minFilter = THREE.LinearFilter;
   tex.needsUpdate = true;
   return tex;
+}
+
+/* ------------------------------------------------ procedural textures */
+
+/**
+ * Fine streaks that run along U (around the finger). Used as a roughness map, it gives satin
+ * metal a real brushed grain instead of a flat blur; near 1 everywhere, so polish is unaffected.
+ */
+export function grainTexture() {
+  const S = 256;
+  const c = document.createElement('canvas');
+  c.width = 4;
+  c.height = S;
+  const ctx = c.getContext('2d')!;
+  const img = ctx.createImageData(4, S);
+  let prev = 0.5;
+  for (let y = 0; y < S; y++) {
+    // A slightly correlated random walk across the width of the band, so streaks have body.
+    prev = prev * 0.55 + Math.random() * 0.45;
+    const v = Math.round((0.72 + 0.28 * prev) * 255);
+    for (let x = 0; x < 4; x++) img.data.set([v, v, v, 255], (y * 4 + x) * 4);
+  }
+  ctx.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = 8;
+  t.needsUpdate = true;
+  return t;
+}
+
+/**
+ * Light focused through a faceted stone onto the surface below: a network of bright ridges
+ * (sum of warped sine ridges) inside a soft radial falloff. White with alpha, so the material
+ * colour can tint it to the gemstone.
+ */
+export function causticTexture() {
+  const S = 256;
+  const c = document.createElement('canvas');
+  c.width = c.height = S;
+  const ctx = c.getContext('2d')!;
+  const img = ctx.createImageData(S, S);
+  for (let j = 0; j < S; j++) {
+    for (let i = 0; i < S; i++) {
+      const x = i / S;
+      const y = j / S;
+      let v = 0;
+      for (let k = 0; k < 4; k++) {
+        const a = k * 1.7 + 0.4;
+        const u = x * Math.cos(a) + y * Math.sin(a);
+        const w = (y * Math.cos(a) - x * Math.sin(a)) * 9 + k * 1.3;
+        const ridge = 1 - Math.abs(Math.sin((u + 0.16 * Math.sin(w)) * (5 + k * 3.2) * Math.PI));
+        v += Math.pow(ridge, 7);
+      }
+      const d = Math.hypot(x - 0.5, y - 0.5) * 2;
+      const fall = Math.max(0, 1 - d);
+      const m = fall * fall * (3 - 2 * fall);
+      const a = Math.min(1, v * 0.5) * m;
+      img.data.set([255, 255, 255, Math.round(a * 255)], (j * S + i) * 4);
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  t.needsUpdate = true;
+  return t;
+}
+
+
+/* ------------------------------------------------------------ glints */
+
+export type GlintSite = { pos: THREE.Vector3; normal: THREE.Vector3; size: number; phase: number };
+
+/** A small seeded random generator, so the sparkle pattern is the same on every visit. */
+function seeded(seed: number) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Where a ring can throw a star of light: points on the centre stone's crown facets (each
+ * with that facet's slope), the table, and the top of every small stone. Positions are in
+ * the ring's local space, matching the group the stone is drawn in.
+ */
+export function glintSites(cut: Cut, carat: number, model: RingModel): GlintSite[] {
+  const s = stoneSpec(cut, carat);
+  const o = outlineFor(cut, s.W, s.L);
+  const rnd = seeded(cut.length * 97 + Math.round(carat * 10));
+  const sites: GlintSite[] = [];
+  const crownBase = model.stoneY + s.g / 2;
+  const n = 16;
+  for (let k = 0; k < n; k++) {
+    const t = (k + 0.5) / n;
+    const [x, z] = o.at(t);
+    const [nx, nz] = outwardNormal(o, t);
+    const inner = k % 2 === 1; // alternate star facets (near the table) and upper girdle facets
+    const f = inner ? 0.62 : 0.86;
+    const slope = inner ? 0.4 : 0.66;
+    sites.push({
+      pos: new THREE.Vector3(x * f, crownBase + s.hc * (1 - f) * 1.15, z * f),
+      normal: new THREE.Vector3(nx * Math.sin(slope), Math.cos(slope), nz * Math.sin(slope)).normalize(),
+      size: s.W * (inner ? 0.17 : 0.22),
+      phase: rnd(),
+    });
+  }
+  sites.push({ pos: new THREE.Vector3(0, crownBase + s.hc, 0), normal: new THREE.Vector3(0, 1, 0), size: s.W * 0.26, phase: rnd() });
+  for (const a of model.accents) {
+    const jitter = new THREE.Vector3(rnd() - 0.5, rnd() - 0.5, rnd() - 0.5).multiplyScalar(0.55);
+    sites.push({
+      pos: a.pos.clone().addScaledVector(a.up, a.size * 0.2),
+      normal: a.up.clone().add(jitter).normalize(),
+      size: a.size * 1.05,
+      phase: rnd(),
+    });
+  }
+  return sites;
+}
+
+/** A soft round pool of light for the floor: white in the middle, fading to nothing. */
+export function poolTexture() {
+  const S = 128;
+  const c = document.createElement('canvas');
+  c.width = c.height = S;
+  const ctx = c.getContext('2d')!;
+  const g = ctx.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.3, 'rgba(255,255,255,0.62)');
+  g.addColorStop(0.65, 'rgba(255,255,255,0.18)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, S, S);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.needsUpdate = true;
+  return t;
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Home as HomeIcon, Sparkles, Box, Camera, Map, Ruler, Diamond, User } from 'lucide-react';
+import { Home as HomeIcon, Sparkles, Box, Camera, Map, Ruler, User } from 'lucide-react';
 import gsap from 'gsap';
 import { cn } from './lib/utils';
 
@@ -15,59 +15,42 @@ import RingSizer from './pages/RingSizer';
 import Profile from './pages/Profile';
 import Wishlist from './pages/Wishlist';
 
+/**
+ * Opening card: the master logo revealed left to right, then the star submark and the
+ * brand line, as on the style sheet. Reduced motion shows it still, briefly.
+ */
 function SplashScreen() {
   const [gone, setGone] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
-  const diamondRef = useRef<HTMLDivElement>(null);
-  const subtitleRef = useRef<HTMLParagraphElement>(null);
+  const logoRef = useRef<HTMLImageElement>(null);
+  const starRef = useRef<HTMLSpanElement>(null);
+  const tagRef = useRef<HTMLParagraphElement>(null);
 
   useEffect(() => {
+    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const ctx = gsap.context(() => {
-      const tl = gsap.timeline({
-        onComplete() {
-          // exit: blur + fade the whole screen out
-          gsap.to(rootRef.current, {
-            opacity: 0,
-            filter: 'blur(8px)',
-            duration: 0.9,
-            ease: 'power2.inOut',
-            delay: 0.6,
-            onComplete: () => setGone(true),
-          });
-        },
-      });
-
-      // 1. Diamond materialises
+      const exit = () =>
+        gsap.to(rootRef.current, {
+          opacity: 0,
+          duration: still ? 0.3 : 0.9,
+          ease: 'power2.inOut',
+          delay: still ? 0.9 : 0.5,
+          onComplete: () => setGone(true),
+        });
+      if (still) {
+        exit();
+        return;
+      }
+      const tl = gsap.timeline({ onComplete: exit });
+      // 1. The master logo is revealed left to right, like light passing across polished metal.
       tl.fromTo(
-        diamondRef.current,
-        { scale: 0.5, opacity: 0, filter: 'blur(16px)', rotate: -15 },
-        { scale: 1, opacity: 1, filter: 'blur(0px)', rotate: 0, duration: 1.1, ease: 'expo.out' },
+        logoRef.current,
+        { clipPath: 'inset(0 100% 0 0)', opacity: 0.2 },
+        { clipPath: 'inset(0 0% 0 0)', opacity: 1, duration: 1.4, ease: 'power3.inOut' },
       );
-
-      // 2. "VELA" letters stagger in
-      tl.fromTo(
-        '.splash-letter',
-        { y: 24, opacity: 0, filter: 'blur(8px)' },
-        { y: 0, opacity: 1, filter: 'blur(0px)', duration: 0.7, stagger: 0.09, ease: 'power3.out' },
-        '-=0.55',
-      );
-
-      // 3. Subtitle rises
-      tl.fromTo(
-        subtitleRef.current,
-        { y: 10, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.7, ease: 'power2.out' },
-        '-=0.3',
-      );
-
-      // 4. Diamond subtle pulse while holding
-      tl.to(diamondRef.current, {
-        scale: 1.06,
-        duration: 0.9,
-        ease: 'sine.inOut',
-        yoyo: true,
-        repeat: 1,
-      }, '+=0.2');
+      // 2. The star turns in, then the brand line settles beneath it.
+      tl.fromTo(starRef.current, { opacity: 0, rotate: -45, scale: 0.6 }, { opacity: 1, rotate: 0, scale: 1, duration: 0.9, ease: 'expo.out' }, '-=0.3');
+      tl.fromTo(tagRef.current, { opacity: 0, letterSpacing: '0.6em' }, { opacity: 1, letterSpacing: '0.42em', duration: 1, ease: 'power2.out' }, '-=0.6');
     }, rootRef);
 
     return () => ctx.revert();
@@ -76,24 +59,12 @@ function SplashScreen() {
   if (gone) return null;
 
   return (
-    <div
-      ref={rootRef}
-      aria-hidden
-      className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-vela-black pointer-events-none"
-    >
-      <div className="flex flex-col items-center">
-        <div ref={diamondRef} className="mb-8">
-          <Diamond className="text-vela-gold drop-shadow-[0_0_18px_rgba(251,222,147,0.4)]" size={48} strokeWidth={1} />
-        </div>
-        <h1 className="mb-4 flex font-serif text-5xl uppercase tracking-[0.28em] text-vela-gold">
-          {'VELA'.split('').map((ch, i) => (
-            <span key={i} className="splash-letter inline-block">{ch}</span>
-          ))}
-        </h1>
-        <p ref={subtitleRef} className="text-xs font-light uppercase tracking-[0.4em] text-vela-light/60">
-          Bespoke Jewellers
-        </p>
-      </div>
+    <div ref={rootRef} aria-hidden className="pointer-events-none fixed inset-0 z-[100] flex flex-col items-center justify-center bg-midnight">
+      <img ref={logoRef} src="/brand/vela-logo-white.png" alt="" width={1909} height={597} className="h-auto w-[min(64vw,300px)]" />
+      <span ref={starRef} className="vela-mark vela-mark-star mt-12 w-5 text-clay" />
+      <p ref={tagRef} className="mt-4 text-[10px] font-normal uppercase tracking-[0.42em] text-stone-40">
+        Attainable luxury
+      </p>
     </div>
   );
 }
@@ -111,7 +82,7 @@ function Navigation() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 border-t border-vela-gray/20 bg-vela-black/95 backdrop-blur-xl"
+      className="fixed bottom-0 left-0 right-0 z-50 border-t border-stone/30 bg-midnight/95 backdrop-blur-xl"
       style={{ paddingBottom: 'max(0.35rem, env(safe-area-inset-bottom))' }}
       aria-label="Primary"
     >
@@ -126,19 +97,19 @@ function Navigation() {
               className={cn(
                 'flex min-w-[3.25rem] flex-col items-center gap-1 rounded-lg px-1.5 pb-1.5 pt-1 transition-colors',
                 isActive
-                  ? 'text-vela-gold'
-                  : 'text-vela-light/45 hover:text-vela-light/85'
+                  ? 'text-cloud'
+                  : 'text-stone-60 hover:text-cloud/85'
               )}
             >
               <span
                 className={cn(
                   'h-0.5 w-5 rounded-full transition-colors',
-                  isActive ? 'bg-vela-gold/90' : 'bg-transparent'
+                  isActive ? 'bg-cloud' : 'bg-transparent'
                 )}
                 aria-hidden
               />
               <Icon size={22} strokeWidth={isActive ? 1.35 : 1} className="shrink-0" />
-              <span className={cn('vela-type-micro', isActive ? 'text-vela-gold/90' : '')}>{item.label}</span>
+              <span className={cn('vela-type-micro', isActive ? 'text-cloud' : 'text-stone-60')}>{item.label}</span>
             </Link>
           );
         })}
@@ -149,19 +120,12 @@ function Navigation() {
 
 function Header() {
   return (
-    <header className="sticky top-0 z-40 flex shrink-0 items-center justify-between border-b border-vela-gray/20 bg-vela-black/88 px-6 py-3.5 backdrop-blur-md supports-[backdrop-filter]:bg-vela-black/78">
-      <Link to="/" className="group flex min-w-0 items-center gap-2.5">
-        <Diamond className="size-[18px] shrink-0 text-vela-gold" strokeWidth={1.25} aria-hidden />
-        <span className="vela-wordmark transition-colors group-hover:text-vela-gold">
-          Vela
-        </span>
+    <header className="sticky top-0 z-40 flex shrink-0 items-center justify-between border-b border-stone/30 bg-midnight/90 px-6 py-4 backdrop-blur-md supports-[backdrop-filter]:bg-midnight/80">
+      <Link to="/" aria-label="Vela Jewellers, home" className="flex min-w-0 items-center opacity-95 transition-opacity hover:opacity-100">
+        <img src="/brand/vela-wordmark-white.png" alt="Vela Jewellers" width={1909} height={470} className="h-[19px] w-auto" />
       </Link>
       <div className="flex items-center gap-1 sm:gap-2">
-        <Link
-          to="/jewellery-box"
-          className="vela-icon-btn"
-          aria-label="Digital jewellery box"
-        >
+        <Link to="/jewellery-box" className="vela-icon-btn" aria-label="Digital jewellery box">
           <Box size={20} strokeWidth={1.35} />
         </Link>
         <Link to="/sizer" className="vela-icon-btn" aria-label="Ring sizer">
@@ -175,25 +139,35 @@ function Header() {
   );
 }
 
+/** Most pages are a phone-width column; the 3D studio gets the whole window. */
+function Main() {
+  const wide = useLocation().pathname === '/design/3d';
+  return (
+    <main
+      className={`relative mx-auto flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden ${wide ? 'max-w-none' : 'max-w-md'}`}
+    >
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/design/ai" element={<AIDesign />} />
+        <Route path="/design/3d" element={<Configurator3D />} />
+        <Route path="/try-on" element={<ARTryOn />} />
+        <Route path="/journey" element={<JourneyTracker />} />
+        <Route path="/jewellery-box" element={<JewelleryBox />} />
+        <Route path="/sizer" element={<RingSizer />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/wishlist" element={<Wishlist />} />
+      </Routes>
+    </main>
+  );
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <SplashScreen />
-      <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-vela-black text-vela-light font-sans">
+      <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-midnight text-cloud font-sans">
         <Header />
-        <main className="relative mx-auto flex h-full min-h-0 w-full max-w-md flex-1 flex-col overflow-hidden">
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/design/ai" element={<AIDesign />} />
-            <Route path="/design/3d" element={<Configurator3D />} />
-            <Route path="/try-on" element={<ARTryOn />} />
-            <Route path="/journey" element={<JourneyTracker />} />
-            <Route path="/jewellery-box" element={<JewelleryBox />} />
-            <Route path="/sizer" element={<RingSizer />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/wishlist" element={<Wishlist />} />
-          </Routes>
-        </main>
+        <Main />
         <Navigation />
       </div>
     </BrowserRouter>
